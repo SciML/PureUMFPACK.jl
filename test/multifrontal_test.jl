@@ -77,4 +77,38 @@ isperm1(p, n) = sort(p) == collect(1:n)
               [1.0, 2.0, 3.0, 4.0]
         @test_throws ArgumentError splu(D; method = :nonsense)
     end
+
+    @testset "threaded == serial (identical fill & solution)" begin
+        # Elimination-tree multithreading must produce a bit-identical factor to the
+        # serial path: same structure, same numeric values, same solution.  Forcing
+        # parallel_threshold = 0 engages the threaded driver regardless of size (a
+        # no-op when run with a single thread, which still exercises the threaded
+        # code path).  Comparing the two `multifrontal_lu` factorizations of the same
+        # (unscaled) matrix isolates the threading from scaling.
+        tsolve(F,
+            b) = (n = length(b);
+            c = collect(float.(b[F.p]));
+            PureUMFPACK.lsolve!(F.L, c);
+            PureUMFPACK.usolve!(F.U, c);
+            x = similar(c);
+            x[F.q] = c;
+            x)
+        for A in (poisson2d(24), poisson3d(8), poisson3d(12),
+            randmat(800, 6), arrowband(800, 4))
+            n = size(A, 1)
+            Fs = multifrontal_lu(A; check = false, threaded = false)
+            Ft = multifrontal_lu(A; check = false, threaded = true,
+                parallel_threshold = 0)
+            @test Fs.L.colptr == Ft.L.colptr && Fs.L.rowval == Ft.L.rowval
+            @test Fs.U.colptr == Ft.U.colptr && Fs.U.rowval == Ft.U.rowval
+            @test Fs.L.nzval == Ft.L.nzval && Fs.U.nzval == Ft.U.nzval
+            @test Fs.p == Ft.p && Fs.q == Ft.q
+            @test nnz(Fs.L) + nnz(Fs.U) == nnz(Ft.L) + nnz(Ft.U)
+            b = randn(n)
+            xs = tsolve(Fs, b)
+            xt = tsolve(Ft, b)
+            @test xs == xt
+            @test norm(A * xt - b) / norm(b) <= 1e-8
+        end
+    end
 end
