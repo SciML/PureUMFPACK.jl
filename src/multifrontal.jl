@@ -96,17 +96,22 @@ function _factor_colptrs(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
 end
 
 """
-    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, check=true) -> GPLUFactorization
+    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, relax=0, check=true) -> GPLUFactorization
 
 Supernodal multifrontal LU. Returns the same `GPLUFactorization` (`A[p,q]==L*U`)
 as [`gplu`](@ref), so it shares the triangular solves. `q` defaults to the AMD +
 postorder ordering from [`symbolic_mf`](@ref).
+
+`relax` controls supernode amalgamation: `relax == 0` (the default) uses the
+fundamental partition with no extra fill; `relax > 0` merges a child supernode
+into its parent when at most `relax` extra explicit (structural-zero) entries per
+column would result, trading a little extra fill for fewer/larger dense fronts.
 """
 function multifrontal_lu(A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
-        check::Bool = true) where {Tv, Ti <: Integer}
+        relax::Integer = 0, check::Bool = true) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("multifrontal_lu requires a square matrix"))
-    S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)
+    S = q === nothing ? symbolic_mf(A; relax = relax) : symbolic_mf(A; q = q, relax = relax)
     qf = S.qf
     V = A[qf, qf]
     Vt = copy(transpose(V))
