@@ -49,6 +49,7 @@ function _drop_diag_0based(S::SparseMatrixCSC)
     Si = rowvals(S)
     cnz = 0
     @inbounds for j in 1:n, p in Sp[j]:(Sp[j + 1] - 1)
+
         Si[p] != j && (cnz += 1)
     end
     ci = Vector{Int}(undef, cnz)

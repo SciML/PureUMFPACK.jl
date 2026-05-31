@@ -67,9 +67,9 @@ isperm1(p, n) = sort(p) == collect(1:n)
         M = A + A'
         fnat = (F = gplu(M; q = 1:n, tol = 0.0); nnz(F.L) + nnz(F.U))
         famd = (p = amd_order_sym(A);
-        F = gplu(M[p, p]; q = 1:n, tol = 0.0);
-        nnz(F.L) +
-        nnz(F.U))
+            F = gplu(M[p, p]; q = 1:n, tol = 0.0);
+            nnz(F.L) +
+            nnz(F.U))
         @test famd < fnat / 2
     end
 
@@ -79,6 +79,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
             b = randn(n)
             xref = Matrix(A) \ b
             for ord in (:natural, :amd, :colamd), sc in (SCALE_NONE, SCALE_SUM, SCALE_MAX)
+
                 F = splu(A; ordering = ord, tol = 0.1, scale = sc)
                 x = solve(F, b)
                 @test norm(A * x - b) / norm(b) <= 1e-8

@@ -21,7 +21,7 @@ Base.size(F::PureLU) = (size(F.L, 1), size(F.U, 2))
 Base.size(F::PureLU, i::Integer) = size(F)[i]
 
 """
-    splu(A; method=:gplu, ordering=:amd, tol=0.1, scale=SCALE_SUM, check=true) -> PureLU
+    splu(A; method=:gplu, ordering=:amd, tol=0.1, relax=0, scale=SCALE_SUM, check=true) -> PureLU
 
 Factorize sparse `A`.
 
@@ -32,16 +32,19 @@ Factorize sparse `A`.
   / structurally symmetric systems); it ignores `ordering` (uses AMD + postorder).
 - `ordering` ∈ (`:amd`, `:colamd`, `:natural`)  (`:gplu` only).
 - `scale` ∈ (`SCALE_SUM`, `SCALE_MAX`, `SCALE_NONE`); `tol` is the pivot threshold.
+- `relax` (`:multifrontal` only) relaxes supernode amalgamation: `0` (default)
+  keeps the fundamental partition with no extra fill; `relax > 0` allows up to
+  `relax` extra explicit entries per column to form fewer/larger dense fronts.
 """
 function splu(A::SparseMatrixCSC{Tv, Ti}; method::Symbol = :gplu, ordering::Symbol = :amd,
-        tol::Real = 0.1, scale::ScaleKind = SCALE_SUM, check::Bool = true) where {
-        Tv, Ti <: Integer}
+        tol::Real = 0.1, relax::Integer = 0, scale::ScaleKind = SCALE_SUM,
+        check::Bool = true) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("splu requires a square matrix"))
     Rs = row_scaling(A, scale)
     As = scale == SCALE_NONE ? A : apply_row_scaling(A, Rs)
     if method === :multifrontal
-        F = multifrontal_lu(As; check = check)
+        F = multifrontal_lu(As; relax = relax, check = check)
         return PureLU(F.L, F.U, F.p, F.q, Rs, A)
     elseif method !== :gplu
         throw(ArgumentError("unknown method $method"))
