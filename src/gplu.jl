@@ -36,9 +36,11 @@ end
 # once it has become a pivot, i.e. when `pinv[j] >= 1`; then its neighbours are
 # the row indices stored in column `pinv[j]` of the partial L.  Finished nodes
 # are written to `xi[top..n]` in reverse-finish (topological) order.
-@inline function _dfs!(j0::Ti, Lp, Li, pinv, top::Ti,
+@inline function _dfs!(
+        j0::Ti, Lp, Li, pinv, top::Ti,
         xi::Vector{Ti}, stack::Vector{Ti}, pstack::Vector{Ti},
-        marked::Vector{Bool}) where {Ti}
+        marked::Vector{Bool}
+    ) where {Ti}
     head = 1
     stack[1] = j0
     @inbounds while head >= 1
@@ -75,9 +77,11 @@ end
 
 # Reach(A(:,col)) in the graph of L, returned as the topologically ordered slice
 # xi[top..n].  Leaves `marked` all-false on exit.
-@inline function _reach!(Lp, Li, Ap, Ai, col::Ti, pinv,
+@inline function _reach!(
+        Lp, Li, Ap, Ai, col::Ti, pinv,
         xi::Vector{Ti}, stack::Vector{Ti}, pstack::Vector{Ti},
-        marked::Vector{Bool}, n::Ti) where {Ti}
+        marked::Vector{Bool}, n::Ti
+    ) where {Ti}
     top = n + one(Ti)
     @inbounds for p in Ap[col]:(Ap[col + 1] - 1)
         b = Ai[p]
@@ -103,8 +107,10 @@ canonical sorted CSC form.
 """
 function gplu(
         A::SparseMatrixCSC{Tv, Ti}; q::AbstractVector{<:Integer} = Base.OneTo(size(A, 2)),
-        tol::Real = 0.1, check::Bool = true, sort_factors::Bool = true) where {
-        Tv, Ti <: Integer}
+        tol::Real = 0.1, check::Bool = true, sort_factors::Bool = true
+    ) where {
+        Tv, Ti <: Integer,
+    }
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("gplu requires a square matrix"))
     qv = collect(Ti, q)

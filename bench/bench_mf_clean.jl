@@ -19,11 +19,15 @@ function bestof(f, n)
     return m
 end
 
-mats = [("poisson3d-16", poisson3d(16)), ("poisson3d-24", poisson3d(24)),
-    ("poisson3d-30", poisson3d(30)), ("poisson3d-36", poisson3d(36))]
+mats = [
+    ("poisson3d-16", poisson3d(16)), ("poisson3d-24", poisson3d(24)),
+    ("poisson3d-30", poisson3d(30)), ("poisson3d-36", poisson3d(36)),
+]
 
-@printf("%-14s %-7s | %-10s %-10s | %-7s | %-9s %-8s\n",
-    "matrix", "n", "UMF(s)", "mf(s)", "mf/UMF", "fill=UMF?", "recon")
+@printf(
+    "%-14s %-7s | %-10s %-10s | %-7s | %-9s %-8s\n",
+    "matrix", "n", "UMF(s)", "mf(s)", "mf/UMF", "fill=UMF?", "recon"
+)
 for (nm, A) in mats
     n = size(A, 1)
     b = randn(n)
@@ -35,8 +39,10 @@ for (nm, A) in mats
     tu = bestof(() -> lu(A), ns)
     tm = bestof(() -> multifrontal_lu(A; check = false), ns)
     res = norm(A * (splu(A; method = :multifrontal) \ b) - b) / norm(b)
-    @printf("%-14s %-7d | %-10.4g %-10.4g | %-7.2f | %-9s %.1e\n",
-        nm, n, tu, tm, tm/tu, fm == fu ? "yes" : "NO($fm)", res)
+    @printf(
+        "%-14s %-7d | %-10.4g %-10.4g | %-7.2f | %-9s %.1e\n",
+        nm, n, tu, tm, tm / tu, fm == fu ? "yes" : "NO($fm)", res
+    )
     flush(stdout)
 end
 println("CLEAN_BENCH_DONE")

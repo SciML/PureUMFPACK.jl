@@ -1,7 +1,9 @@
 using Documenter, PureUMFPACK
 
-cp(joinpath(@__DIR__, "..", "README.md"), joinpath(@__DIR__, "src", "index.md");
-    force = true)
+cp(
+    joinpath(@__DIR__, "..", "README.md"), joinpath(@__DIR__, "src", "index.md");
+    force = true
+)
 
 makedocs(;
     modules = [PureUMFPACK],
@@ -10,14 +12,17 @@ makedocs(;
     format = Documenter.HTML(;
         prettyurls = get(ENV, "CI", "false") == "true",
         canonical = "https://docs.sciml.ai/PureUMFPACK/stable/",
-        assets = String[]),
+        assets = String[]
+    ),
     pages = [
         "Home" => "index.md",
-        "API" => "api.md"
+        "API" => "api.md",
     ],
-    checkdocs = :exports)
+    checkdocs = :exports
+)
 
 deploydocs(;
     repo = "github.com/SciML/PureUMFPACK.jl",
     devbranch = "master",
-    push_preview = true)
+    push_preview = true
+)

@@ -33,9 +33,12 @@ Factorize sparse `A`.
 - `ordering` ∈ (`:amd`, `:colamd`, `:natural`)  (`:gplu` only).
 - `scale` ∈ (`SCALE_SUM`, `SCALE_MAX`, `SCALE_NONE`); `tol` is the pivot threshold.
 """
-function splu(A::SparseMatrixCSC{Tv, Ti}; method::Symbol = :gplu, ordering::Symbol = :amd,
-        tol::Real = 0.1, scale::ScaleKind = SCALE_SUM, check::Bool = true) where {
-        Tv, Ti <: Integer}
+function splu(
+        A::SparseMatrixCSC{Tv, Ti}; method::Symbol = :gplu, ordering::Symbol = :amd,
+        tol::Real = 0.1, scale::ScaleKind = SCALE_SUM, check::Bool = true
+    ) where {
+        Tv, Ti <: Integer,
+    }
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("splu requires a square matrix"))
     Rs = row_scaling(A, scale)

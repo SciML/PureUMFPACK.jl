@@ -12,13 +12,15 @@ using SparseArrays, LinearAlgebra, Printf
 include(joinpath(@__DIR__, "matrices.jl"))
 BLAS.set_num_threads(1)
 
-bestof(f, n) = (f();
-m = Inf;
-for _ in 1:n
-    t = @elapsed f()
-    t < m && (m = t)
-end;
-m)
+bestof(f, n) = (
+    f();
+    m = Inf;
+    for _ in 1:n
+        t = @elapsed f()
+        t < m && (m = t)
+    end;
+    m
+)
 
 ks = [12, 16, 20, 24, 28, 32, 36]            # n = k^3: 1728 .. 46656
 ns = Int[];
@@ -45,12 +47,18 @@ for k in ks
     push!(gctime, st.gctime)
     S = symbolic_mf(A)
     push!(nsup, length(S.sstart) - 1)
-    push!(maxfr,
-        maximum(length(S.colstruct[S.sstart[s + 1] - 1]) + (S.sstart[s + 1] - S.sstart[s])
-        for s in 1:(length(S.sstart) - 1)))
-    @printf("k=%-2d n=%-6d UMF=%.4gs full=%.4gs sym=%.4gs num=%.4gs mf/UMF=%.2f alloc=%.0fMiB gc=%.3gs nsup=%d maxfront=%d\n",
-        k, n, tu[end], tfull[end], tsym[end], tfull[end]-tsym[end], tfull[end]/tu[end],
-        allocs[end], gctime[end], nsup[end], maxfr[end])
+    push!(
+        maxfr,
+        maximum(
+            length(S.colstruct[S.sstart[s + 1] - 1]) + (S.sstart[s + 1] - S.sstart[s])
+                for s in 1:(length(S.sstart) - 1)
+        )
+    )
+    @printf(
+        "k=%-2d n=%-6d UMF=%.4gs full=%.4gs sym=%.4gs num=%.4gs mf/UMF=%.2f alloc=%.0fMiB gc=%.3gs nsup=%d maxfront=%d\n",
+        k, n, tu[end], tfull[end], tsym[end], tfull[end] - tsym[end], tfull[end] / tu[end],
+        allocs[end], gctime[end], nsup[end], maxfr[end]
+    )
     flush(stdout)
 end
 
@@ -61,8 +69,10 @@ for i in 2:length(ns)
     @printf(" %d->%d", ns[i - 1], ns[i])
 end;
 println();
-for (nm, y) in (("UMFPACK", tu), ("mf full", tfull), ("mf symbolic", tsym),
-    ("mf numeric", tfull .- tsym), ("mf alloc", allocs))
+for (nm, y) in (
+        ("UMFPACK", tu), ("mf full", tfull), ("mf symbolic", tsym),
+        ("mf numeric", tfull .- tsym), ("mf alloc", allocs),
+    )
     @printf("%-11s", nm)
     for i in 2:length(ns)
         @printf(" %5.2f", slope(y, ns, i))

@@ -21,8 +21,10 @@
 end
 
 # Postorder a tree (assembly tree) rooted at node j, numbering from k upward.
-function _tdfs(j::Int, k::Int, head::Vector{Int}, next::Vector{Int},
-        post::Vector{Int}, stack::Vector{Int})
+function _tdfs(
+        j::Int, k::Int, head::Vector{Int}, next::Vector{Int},
+        post::Vector{Int}, stack::Vector{Int}
+    )
     top = 0
     @inbounds stack[1] = j
     @inbounds while top >= 0
@@ -69,8 +71,9 @@ function _drop_diag_0based(S::SparseMatrixCSC)
 end
 
 function _patmat(A::SparseMatrixCSC)
-    SparseMatrixCSC(
-        size(A, 1), size(A, 2), copy(getcolptr(A)), copy(rowvals(A)), ones(nnz(A)))
+    return SparseMatrixCSC(
+        size(A, 1), size(A, 2), copy(getcolptr(A)), copy(rowvals(A)), ones(nnz(A))
+    )
 end
 
 # pattern of (A + Aᵀ), diagonal dropped, 0-based
