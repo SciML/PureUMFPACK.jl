@@ -2,7 +2,6 @@ name = "PureUMFPACK"
 uuid = "b7e1f0a2-3c4d-4e5f-9a0b-1c2d3e4f5a6b"
 authors = ["Chris Rackauckas <accounts@chrisrackauckas.com> and contributors"]
 version = "0.1.0"
-license = "GPL-2.0-or-later"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
