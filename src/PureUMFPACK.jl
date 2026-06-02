@@ -1,3 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2005-2023 Timothy A. Davis (UMFPACK, SuiteSparse) -- GPL-2.0-or-later
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# PureUMFPACK.jl is a Julia port of SuiteSparse UMFPACK and CSparse, distributed
+# under the GNU GPL v2 or later; see the LICENSE and NOTICE files. SuiteSparse is
+# by Timothy A. Davis -- http://www.suitesparse.com (used by permission).
+
 module PureUMFPACK
 
 using SparseArrays

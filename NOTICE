@@ -1,0 +1,49 @@
+PureUMFPACK.jl
+Copyright (c) 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+SPDX-License-Identifier: GPL-2.0-or-later
+
+PureUMFPACK.jl is a Julia derivative work (a port / translation) of components of
+SuiteSparse by Timothy A. Davis. It is licensed under the GNU General Public
+License, version 2 or later (see the LICENSE file), because it derives from the
+following SuiteSparse components and inherits their copyleft terms.
+
+--------------------------------------------------------------------------------
+UMFPACK
+--------------------------------------------------------------------------------
+UMFPACK, Copyright (c) 2005-2023, Timothy A. Davis. All Rights Reserved.
+License: GPL-2.0-or-later.
+Availability: http://www.suitesparse.com
+Used by permission.
+
+The supernodal multifrontal LU kernel in src/multifrontal.jl (and the symbolic
+analysis feeding it in src/symbolic.jl) implements UMFPACK's algorithm, and the
+factorization conventions exposed in src/scaling.jl, src/solve.jl, and
+src/interface.jl follow UMFPACK's semantics (row scaling, the
+(Rs .* A)[p, q] == L * U convention). Because UMFPACK is GPL-2.0-or-later, the
+combined distributed work must be GPL-2.0-or-later; it cannot be relicensed under
+a permissive license such as MIT.
+
+--------------------------------------------------------------------------------
+CSparse
+--------------------------------------------------------------------------------
+CSparse: a Concise Sparse matrix package.
+Copyright (c) 2006, Timothy A. Davis.
+License: LGPL-2.1-or-later.
+Availability: http://www.suitesparse.com
+
+src/amd.jl is a faithful port of CSparse cs_amd; src/symbolic.jl ports
+cs_etree / cs_post / cs_tdfs; colamd_order follows CSparse cs_amd(order = 2)
+(AMD on the A'A column-intersection graph with dense rows dropped -- this is the
+cs_amd order=2 construction, not Davis's separate standalone COLAMD library); and
+the Gilbert-Peierls LU kernel in src/gplu.jl follows CSparse cs_lu.
+
+As permitted by Section 3 of the GNU Lesser General Public License version 2.1,
+the LGPL-2.1-or-later CSparse-derived code is conveyed here under the terms of the
+ordinary GNU General Public License, version 2 or later, so that the entire
+combined work can be distributed under a single GPL-2.0-or-later license.
+
+--------------------------------------------------------------------------------
+AMD algorithm
+--------------------------------------------------------------------------------
+The AMD (approximate minimum degree) ordering is the quotient-graph algorithm of
+Amestoy, Davis & Duff.

@@ -184,3 +184,34 @@ next lever). Possible further work: further cut large-n GC, relaxed supernode
 amalgamation, cross-front
 threshold (delayed) pivoting for general-unsymmetric stability in the multifrontal
 path, and elimination-tree parallelism across independent fronts.
+
+## License
+
+PureUMFPACK.jl is licensed under the **GNU General Public License, version 2 or
+later** (`SPDX-License-Identifier: GPL-2.0-or-later`). The full text is in
+[`LICENSE`](LICENSE); third-party attributions are in [`NOTICE`](NOTICE).
+
+This package is **not** MIT-licensed, and deliberately so. It is a direct Julia
+translation of code from Tim Davis's
+[SuiteSparse](https://github.com/DrTimothyAldenDavis/SuiteSparse), so it is a
+derivative work that inherits SuiteSparse's copyleft terms:
+
+- The supernodal multifrontal kernel (`src/multifrontal.jl`) implements
+  **UMFPACK**'s algorithm, and the scaling/solve/interface layers follow UMFPACK's
+  conventions. UMFPACK is licensed **GPL-2.0-or-later**, Copyright © 2005–2023
+  Timothy A. Davis.
+- The AMD ordering (`src/amd.jl`) is a faithful port of **CSparse** `cs_amd`, the
+  symbolic analysis (`src/symbolic.jl`) ports `cs_etree`/`cs_post`/`cs_tdfs`,
+  `colamd_order` follows CSparse `cs_amd(order = 2)` (AMD on the AᵀA graph with
+  dense rows dropped — *not* Davis's separate standalone COLAMD library), and the
+  Gilbert–Peierls LU (`src/gplu.jl`) follows CSparse `cs_lu`. CSparse is licensed
+  **LGPL-2.1-or-later**, Copyright © 2006 Timothy A. Davis.
+
+Under copyright law a translation is a modification, so a faithful port of UMFPACK
+must be distributed under the same (or a later) GPL — it cannot be relicensed under
+a permissive license such as MIT. The LGPL-2.1-or-later CSparse code is conveyed
+under the GNU GPL as permitted by LGPL-2.1 §3, so the combined work is distributed
+under a single **GPL-2.0-or-later** license.
+
+SuiteSparse is available at <http://www.suitesparse.com>; the original copyright,
+license, and availability notices are retained as required.

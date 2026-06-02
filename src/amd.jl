@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Pure-Julia Approximate Minimum Degree (symmetric, on the pattern of A + Aᵀ).
 #
 # Faithful port of Tim Davis's CSparse `cs_amd` (order = 1).  Translation strategy:

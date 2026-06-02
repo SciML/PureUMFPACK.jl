@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Triangular solves on the CSC factors and the full sparse solve.
 #
 # After `_sortcols`, within each column row indices ascend, so the unit diagonal
