@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Symbolic analysis for the supernodal multifrontal factorization.
 #
 # Pipeline (all on the symmetric pattern of A + Aᵀ):

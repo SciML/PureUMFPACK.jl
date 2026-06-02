@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2005-2023 Timothy A. Davis (UMFPACK, SuiteSparse) -- GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Supernodal multifrontal LU — the UMFPACK-style dense-front algorithm.
 #
 # Factorizes V = A[qf,qf] (qf from `symbolic_mf`) over its structurally-symmetric

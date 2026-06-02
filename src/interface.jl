@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2005-2023 Timothy A. Davis (UMFPACK, SuiteSparse) -- GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # High-level factorization API mirroring SparseArrays' UMFPACK interface:
 # the returned factorization satisfies  (Rs .* A)[p, q] == L * U.
 
