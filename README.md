@@ -189,7 +189,9 @@ path, and elimination-tree parallelism across independent fronts.
 
 PureUMFPACK.jl is licensed under the **GNU General Public License, version 2 or
 later** (`SPDX-License-Identifier: GPL-2.0-or-later`). The full text is in
-[`LICENSE`](LICENSE); third-party attributions are in [`NOTICE`](NOTICE).
+[`LICENSE`](https://github.com/SciML/PureUMFPACK.jl/blob/master/LICENSE);
+third-party attributions are in
+[`NOTICE`](https://github.com/SciML/PureUMFPACK.jl/blob/master/NOTICE).
 
 This package is **not** MIT-licensed, and deliberately so. It is a direct Julia
 translation of code from Tim Davis's
