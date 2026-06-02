@@ -37,11 +37,13 @@ for k in (24, 32, 36)
     for _ in 1:reps
         multifrontal_lu(A; check = false)
     end
-    wall = (time_ns() - t0) / 1e9
-    gc = (Base.gc_time_ns() - g0) / 1e9
-    @printf("k=%-2d n=%-6d  total_alloc=%.0fMiB  front=%.0fMiB(%.0f%%)  cb=%.0fMiB(%.0f%%)  | over %d reps: wall=%.3gs gc=%.3gs gc_frac=%.1f%%\n",
-        k, n, tot_alloc/2^20, frontbytes/2^20, 100 * frontbytes/tot_alloc,
-        cbbytes/2^20, 100 * cbbytes/tot_alloc, reps, wall, gc, 100 * gc/wall)
+    wall = (time_ns() - t0) / 1.0e9
+    gc = (Base.gc_time_ns() - g0) / 1.0e9
+    @printf(
+        "k=%-2d n=%-6d  total_alloc=%.0fMiB  front=%.0fMiB(%.0f%%)  cb=%.0fMiB(%.0f%%)  | over %d reps: wall=%.3gs gc=%.3gs gc_frac=%.1f%%\n",
+        k, n, tot_alloc / 2^20, frontbytes / 2^20, 100 * frontbytes / tot_alloc,
+        cbbytes / 2^20, 100 * cbbytes / tot_alloc, reps, wall, gc, 100 * gc / wall
+    )
     flush(stdout)
 end
 println("ALLOC_ATTRIB_DONE")

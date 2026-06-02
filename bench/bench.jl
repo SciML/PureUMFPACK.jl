@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "matrices.jl"))
 
 BLAS.set_num_threads(1)   # single-threaded comparison (UMFPACK uses BLAS)
 
-bsec(f) = (@belapsed $f() samples=5 evals=1 seconds=2)
+bsec(f) = (@belapsed $f() samples = 5 evals = 1 seconds = 2)
 
 function run_one(name, A)
     n = size(A, 1)
@@ -39,14 +39,18 @@ function run_one(name, A)
     # correctness sanity
     res_g = norm(A * solve(Fq, b) - b) / norm(b)
 
-    @printf("%-24s n=%-6d nnzA=%-8d | UMF: f=%8.3gs s=%8.3gs fill=%-9d | gplu-id: f=%8.3gs (%.1fx) fill=%-9d | gplu-q: f=%8.3gs (%.1fx) fill=%-9d res=%.1e\n",
+    @printf(
+        "%-24s n=%-6d nnzA=%-8d | UMF: f=%8.3gs s=%8.3gs fill=%-9d | gplu-id: f=%8.3gs (%.1fx) fill=%-9d | gplu-q: f=%8.3gs (%.1fx) fill=%-9d res=%.1e\n",
         name, n, nnz(A),
         t_u_fact, t_u_solve, fill_u,
-        t_i_fact, t_i_fact/t_u_fact, fill_i,
-        t_q_fact, t_q_fact/t_u_fact, fill_q, res_g)
+        t_i_fact, t_i_fact / t_u_fact, fill_i,
+        t_q_fact, t_q_fact / t_u_fact, fill_q, res_g
+    )
     flush(stdout)
-    return (; name, n, nnzA = nnz(A), t_u_fact, t_u_solve, fill_u,
-        t_i_fact, fill_i, t_q_fact, fill_q, res_g)
+    return (;
+        name, n, nnzA = nnz(A), t_u_fact, t_u_solve, fill_u,
+        t_i_fact, fill_i, t_q_fact, fill_q, res_g,
+    )
 end
 
 println("BLAS threads = ", BLAS.get_num_threads())

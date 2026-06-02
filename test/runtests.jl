@@ -16,7 +16,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
                 @test istriu(F.U)
                 @test isperm1(F.p, n) && isperm1(F.q, n)
                 R = Matrix(A[F.p, F.q]) - Matrix(F.L * F.U)
-                @test norm(R) <= 1e-9 * max(1.0, norm(Matrix(A)))
+                @test norm(R) <= 1.0e-9 * max(1.0, norm(Matrix(A)))
             end
         end
     end
@@ -27,7 +27,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
             b = randn(n)
             F = gplu(A; tol = 1.0)
             x = solve(F, b)
-            @test norm(A * x - b) / norm(b) <= 1e-8
+            @test norm(A * x - b) / norm(b) <= 1.0e-8
         end
     end
 
@@ -36,14 +36,16 @@ isperm1(p, n) = sort(p) == collect(1:n)
         b = randn(120)
         Fs = gplu(A; tol = 0.1, sort_factors = true)
         Fu = gplu(A; tol = 0.1, sort_factors = false)
-        @test norm(solve(Fs, b) - solve(Fu, b)) <= 1e-10 * norm(solve(Fs, b))
+        @test norm(solve(Fs, b) - solve(Fu, b)) <= 1.0e-10 * norm(solve(Fs, b))
     end
 
     @testset "sorted factors are canonical CSC (== double-transpose)" begin
         # row indices within each column must ascend, and the sorted factor must
         # equal the canonical form produced by a transpose-transpose round trip.
-        colsorted(S) = all(issorted(@view rowvals(S)[SparseArrays.getcolptr(S)[j]:(SparseArrays.getcolptr(S)[j + 1] - 1)])
-        for j in 1:size(S, 2))
+        colsorted(S) = all(
+            issorted(@view rowvals(S)[SparseArrays.getcolptr(S)[j]:(SparseArrays.getcolptr(S)[j + 1] - 1)])
+                for j in 1:size(S, 2)
+        )
         canon(S) = copy(transpose(copy(transpose(S))))
         for A in (poisson3d(8), randmat(400, 10), arrowband(400, 4))
             F = gplu(A; q = amd_order_sym(A), tol = 0.1)
@@ -66,10 +68,12 @@ isperm1(p, n) = sort(p) == collect(1:n)
         n = size(A, 1)
         M = A + A'
         fnat = (F = gplu(M; q = 1:n, tol = 0.0); nnz(F.L) + nnz(F.U))
-        famd = (p = amd_order_sym(A);
-        F = gplu(M[p, p]; q = 1:n, tol = 0.0);
-        nnz(F.L) +
-        nnz(F.U))
+        famd = (
+            p = amd_order_sym(A);
+            F = gplu(M[p, p]; q = 1:n, tol = 0.0);
+            nnz(F.L) +
+                nnz(F.U)
+        )
         @test famd < fnat / 2
     end
 
@@ -81,8 +85,8 @@ isperm1(p, n) = sort(p) == collect(1:n)
             for ord in (:natural, :amd, :colamd), sc in (SCALE_NONE, SCALE_SUM, SCALE_MAX)
                 F = splu(A; ordering = ord, tol = 0.1, scale = sc)
                 x = solve(F, b)
-                @test norm(A * x - b) / norm(b) <= 1e-8
-                @test norm(x - xref) / norm(xref) <= 1e-6
+                @test norm(A * x - b) / norm(b) <= 1.0e-8
+                @test norm(x - xref) / norm(xref) <= 1.0e-6
             end
         end
     end
@@ -93,7 +97,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
             b = randn(n)
             xu = lu(A) \ b
             xp = splu(A; ordering = :amd) \ b
-            @test norm(xp - xu) / norm(xu) <= 1e-7
+            @test norm(xp - xu) / norm(xu) <= 1.0e-7
         end
     end
 
@@ -103,7 +107,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
         F = splu(A; ordering = :amd, tol = 0.1)
         r0 = norm(A * solve(F, b) - b)
         r2 = norm(A * solve(F, b; refine = 2) - b)
-        @test r2 <= r0 + 1e-12
+        @test r2 <= r0 + 1.0e-12
     end
 
     @testset "edge cases" begin

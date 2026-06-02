@@ -6,30 +6,11 @@ on:
     tags:
       - '*'
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
-  format-check:
-    name: Format Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: julia-actions/setup-julia@v3
-        with:
-          version: '1'
-      - uses: actions/checkout@v6
-      - name: Install JuliaFormatter and format
-        run: |
-          using Pkg
-          Pkg.add(PackageSpec(name = "JuliaFormatter"))
-          using JuliaFormatter
-          format(".", verbose = true)
-        shell: julia --color=yes {0}
-      - name: Check formatting diff
-        run: |
-          out = Cmd(`git diff --name-only`) |> read |> String
-          if out == ""
-              exit(0)
-          else
-              @error "Some files have not been formatted with SciMLStyle !!!"
-              write(stdout, out)
-              exit(1)
-          end
-        shell: julia --color=yes {0}
+  runic:
+    name: "Runic"
+    uses: "SciML/.github/.github/workflows/runic.yml@v1"
+    secrets: "inherit"

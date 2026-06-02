@@ -1,0 +1,4 @@
+[default.extend-words]
+# Source-code identifiers, not prose typos:
+pn = "pn"    # pointer-index variable in the AMD ordering kernel (src/amd.jl)
+Lok = "Lok"  # "L ok" lower-triangular check flag (bench/mf_verify.jl)

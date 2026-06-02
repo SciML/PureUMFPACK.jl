@@ -38,8 +38,10 @@
 # 0-based offset `off`; its rows/cols are the global ids in `rows` (= the child's
 # update set, aliased from `colstruct`).  Function barrier keeps this O(m²) hot loop
 # fully typed for whatever concrete `F` (a Matrix view) is passed.
-@inline function _extend_add!(F::AbstractMatrix{Tv}, loc::Vector{Int}, rows,
-        cbval::Vector{Tv}, off::Int, m::Int) where {Tv}
+@inline function _extend_add!(
+        F::AbstractMatrix{Tv}, loc::Vector{Int}, rows,
+        cbval::Vector{Tv}, off::Int, m::Int
+    ) where {Tv}
     @inbounds for s in 1:m
         cs = loc[rows[s]]
         base = off + (s - 1) * m
@@ -64,8 +66,10 @@ end
 #               supernode whose update set contains J, that supernode's whole pivot
 #               column range.  Counted by scattering each supernode's pivot count
 #               np onto its update columns, plus the triangular own part.
-function _factor_colptrs(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
-        n::Int, ::Type{Ti}) where {Ti}
+function _factor_colptrs(
+        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+        n::Int, ::Type{Ti}
+    ) where {Ti}
     nsuper = length(sstart) - 1
     Lcolptr = Vector{Ti}(undef, n + 1)
     Ucolptr = Vector{Ti}(undef, n + 1)
@@ -102,8 +106,10 @@ Supernodal multifrontal LU. Returns the same `GPLUFactorization` (`A[p,q]==L*U`)
 as [`gplu`](@ref), so it shares the triangular solves. `q` defaults to the AMD +
 postorder ordering from [`symbolic_mf`](@ref).
 """
-function multifrontal_lu(A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
-        check::Bool = true) where {Tv, Ti <: Integer}
+function multifrontal_lu(
+        A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
+        check::Bool = true
+    ) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("multifrontal_lu requires a square matrix"))
     S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)

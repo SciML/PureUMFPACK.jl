@@ -21,18 +21,22 @@ isperm1(p, n) = sort(p) == collect(1:n)
     end
 
     @testset "reconstruction A[p,q] = L*U" begin
-        for A in (sparse(let M = randn(6, 6)
-                M * M' + 6I
-            end),
-            poisson2d(8), poisson2d(24), poisson3d(6), poisson3d(10),
-            randmat(500, 6), arrowband(400, 4))
+        for A in (
+                sparse(
+                    let M = randn(6, 6)
+                        M * M' + 6I
+                    end
+                ),
+                poisson2d(8), poisson2d(24), poisson3d(6), poisson3d(10),
+                randmat(500, 6), arrowband(400, 4),
+            )
             n = size(A, 1)
             F = multifrontal_lu(A; check = false)
             @test istril(F.L) && all(==(1.0), diag(F.L))
             @test istriu(F.U)
             @test isperm1(F.p, n) && isperm1(F.q, n)
             R = Matrix(A[F.p, F.q]) - Matrix(F.L * F.U)
-            @test norm(R) <= 1e-9 * max(1.0, norm(Matrix(A)))
+            @test norm(R) <= 1.0e-9 * max(1.0, norm(Matrix(A)))
         end
     end
 
@@ -51,8 +55,8 @@ isperm1(p, n) = sort(p) == collect(1:n)
             n = size(A, 1)
             b = randn(n)
             x = splu(A; method = :multifrontal) \ b
-            @test norm(A * x - b) / norm(b) <= 1e-8
-            @test norm(x - lu(A) \ b) / norm(lu(A) \ b) <= 1e-7
+            @test norm(A * x - b) / norm(b) <= 1.0e-8
+            @test norm(x - lu(A) \ b) / norm(lu(A) \ b) <= 1.0e-7
         end
     end
 
@@ -61,20 +65,20 @@ isperm1(p, n) = sort(p) == collect(1:n)
         b = randn(size(A, 1))
         for sc in (SCALE_NONE, SCALE_SUM, SCALE_MAX)
             x = solve(splu(A; method = :multifrontal, scale = sc), b)
-            @test norm(A * x - b) / norm(b) <= 1e-8
+            @test norm(A * x - b) / norm(b) <= 1.0e-8
         end
         Ac = sprand(ComplexF64, 300, 300, 8 / 300) + (5 + 0im) * I
         Ac = Ac + Ac'                       # Hermitian-pattern, structurally symmetric
         bc = randn(ComplexF64, 300)
         xc = splu(Ac; method = :multifrontal) \ bc
-        @test norm(Ac * xc - bc) / norm(bc) <= 1e-8
+        @test norm(Ac * xc - bc) / norm(bc) <= 1.0e-8
     end
 
     @testset "edge cases" begin
         @test (splu(sparse(reshape([4.0], 1, 1)); method = :multifrontal) \ [8.0])[1] ≈ 2.0
         D = sparse(Diagonal([2.0, 3.0, 5.0, 7.0]))
         @test splu(D; method = :multifrontal) \ [2.0, 6.0, 15.0, 28.0] ≈
-              [1.0, 2.0, 3.0, 4.0]
+            [1.0, 2.0, 3.0, 4.0]
         @test_throws ArgumentError splu(D; method = :nonsense)
     end
 end
