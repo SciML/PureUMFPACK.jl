@@ -108,7 +108,7 @@ end
 
 Supernodal multifrontal LU. Returns the same `GPLUFactorization` (`A[p,q]==L*U`)
 as [`gplu`](@ref), so it shares the triangular solves. `q` defaults to the AMD +
-postorder ordering from [`symbolic_mf`](@ref).
+postorder ordering from `symbolic_mf`.
 """
 function multifrontal_lu(
         A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
