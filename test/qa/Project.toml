@@ -1,0 +1,12 @@
+[deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+PureUMFPACK = "b7e1f0a2-3c4d-4e5f-9a0b-1c2d3e4f5a6b"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+PureUMFPACK = {path = "../.."}
+
+[compat]
+Aqua = "0.8"
+Test = "1"
+julia = "1.10"
