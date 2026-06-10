@@ -1,5 +1,8 @@
 using Pkg
 
+using PureUMFPACK
+using SparseArrays, LinearAlgebra, Random, Test
+
 const GROUP = get(ENV, "GROUP", "All")
 
 if GROUP == "QA"
@@ -10,8 +13,6 @@ if GROUP == "QA"
 end
 
 if GROUP in ("All", "Core")
-    using PureUMFPACK
-    using SparseArrays, LinearAlgebra, Random, Test
     include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
 
     Random.seed!(1234)
