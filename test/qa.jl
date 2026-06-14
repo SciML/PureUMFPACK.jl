@@ -1,5 +1,6 @@
-using PureUMFPACK, Aqua, Test
+using SafeTestsets
 
-@testset "Aqua quality assurance" begin
+@safetestset "Aqua quality assurance" begin
+    using PureUMFPACK, Aqua, Test
     Aqua.test_all(PureUMFPACK)
 end
