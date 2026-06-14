@@ -1,7 +1,5 @@
 using Pkg
-
-using PureUMFPACK
-using SparseArrays, LinearAlgebra, Random, Test
+using SafeTestsets
 
 const GROUP = get(ENV, "GROUP", "All")
 
@@ -13,13 +11,15 @@ if GROUP == "QA"
 end
 
 if GROUP in ("All", "Core")
-    include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
+    @safetestset "PureUMFPACK" begin
+        using PureUMFPACK
+        using SparseArrays, LinearAlgebra, Random, Test
+        include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
 
-    Random.seed!(1234)
+        Random.seed!(1234)
 
-    isperm1(p, n) = sort(p) == collect(1:n)
+        isperm1(p, n) = sort(p) == collect(1:n)
 
-    @testset "PureUMFPACK" begin
         @testset "gplu reconstruction  A[p,q] = L*U" begin
             for n in (1, 2, 10, 64, 300)
                 for trial in 1:2
@@ -135,8 +135,12 @@ if GROUP in ("All", "Core")
     end
 
     # type-generality suite (ComplexF64, Float32, Int32 indices, singularity)
-    include(joinpath(@__DIR__, "robustness.jl"))
+    @safetestset "type generality" begin
+        include("robustness.jl")
+    end
 
     # supernodal multifrontal kernel
-    include(joinpath(@__DIR__, "multifrontal_test.jl"))
+    @safetestset "multifrontal" begin
+        include("multifrontal_test.jl")
+    end
 end
