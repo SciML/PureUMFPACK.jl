@@ -9,9 +9,7 @@
 
 module PureUMFPACK
 
-using SparseArrays
-using SparseArrays: getcolptr, rowvals, nonzeros
-using LinearAlgebra
+using SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros, nnz
 using LinearAlgebra: SingularException, RowMaximum, UpperTriangular,
     UnitLowerTriangular, lu!, ldiv!, rdiv!, mul!
 
