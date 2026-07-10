@@ -1,5 +1,7 @@
 using SciMLTesting, PureUMFPACK, Test
 
+include("public_api_docs.jl")
+
 run_qa(
     PureUMFPACK;
     explicit_imports = true,
