@@ -10,6 +10,55 @@
 
 @enum ScaleKind SCALE_NONE SCALE_SUM SCALE_MAX
 
+@doc """
+    SCALE_NONE::PureUMFPACK.ScaleKind
+
+Disable row scaling before factorization.
+
+# Examples
+
+```julia
+using PureUMFPACK
+using SparseArrays
+
+A = sparse([1.0 0.0; 0.0 2.0])
+row_scaling(A, SCALE_NONE)
+```
+""" SCALE_NONE
+
+@doc """
+    SCALE_SUM::PureUMFPACK.ScaleKind
+
+Scale each row by the inverse sum of absolute values in that row. This matches
+UMFPACK's default row-scaling mode.
+
+# Examples
+
+```julia
+using PureUMFPACK
+using SparseArrays
+
+A = sparse([1.0 2.0; 0.0 4.0])
+row_scaling(A, SCALE_SUM)
+```
+""" SCALE_SUM
+
+@doc """
+    SCALE_MAX::PureUMFPACK.ScaleKind
+
+Scale each row by the inverse maximum absolute value in that row.
+
+# Examples
+
+```julia
+using PureUMFPACK
+using SparseArrays
+
+A = sparse([1.0 2.0; 0.0 4.0])
+row_scaling(A, SCALE_MAX)
+```
+""" SCALE_MAX
+
 """
     row_scaling(A, kind) -> Rs::Vector
 
