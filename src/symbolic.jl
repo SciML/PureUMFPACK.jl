@@ -16,7 +16,7 @@ function _sym_csc1(A::SparseMatrixCSC)
     Pat = _patmat(A)
     S = Pat + copy(transpose(Pat))            # sorted CSC
     n = size(S, 2)
-    Sp = getcolptr(S)
+    Sp = _colptr(S)
     Si = rowvals(S)
     cp = Vector{Int}(undef, n + 1)
     cp[1] = 1

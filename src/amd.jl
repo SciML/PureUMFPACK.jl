@@ -51,7 +51,7 @@ end
 # Returns (cp, ci, cnz) where cp has length n+1 (cp[j+1] = 0-based start of col j).
 function _drop_diag_0based(S::SparseMatrixCSC)
     n = size(S, 2)
-    Sp = getcolptr(S)
+    Sp = _colptr(S)
     Si = rowvals(S)
     cnz = 0
     @inbounds for j in 1:n, p in Sp[j]:(Sp[j + 1] - 1)
@@ -76,7 +76,7 @@ end
 
 function _patmat(A::SparseMatrixCSC)
     return SparseMatrixCSC(
-        size(A, 1), size(A, 2), copy(getcolptr(A)), copy(rowvals(A)), ones(nnz(A))
+        size(A, 1), size(A, 2), copy(_colptr(A)), copy(rowvals(A)), ones(nnz(A))
     )
 end
 
@@ -92,7 +92,7 @@ function _ata_pattern(A::SparseMatrixCSC; dense_param::Real = 10.0)
     n = size(A, 2)
     Pat = _patmat(A)
     AT = copy(transpose(Pat))                 # AT[:,j] = row j of A
-    ATp = getcolptr(AT)
+    ATp = _colptr(AT)
     densethr = floor(Int, min(n - 2, max(16.0, dense_param * sqrt(n))))
     keep = trues(size(AT, 2))
     @inbounds for j in 1:size(AT, 2)
@@ -104,10 +104,39 @@ function _ata_pattern(A::SparseMatrixCSC; dense_param::Real = 10.0)
 end
 
 """
-    amd_order_sym(A::SparseMatrixCSC) -> Vector{Int}
+    amd_order_sym(A::SparseMatrixCSC; dense=10.0) -> Vector{Int}
 
-Approximate minimum degree permutation `p` (1-based) for the symmetric pattern of
-`A + Aᵀ`.  `(A+Aᵀ)[p,p]` has a sparse Cholesky/LU factor.
+Compute a one-based approximate-minimum-degree permutation for the symmetric
+structural pattern of `A + A'`.
+
+# Arguments
+
+- `A`: Square sparse matrix whose symmetric sparsity pattern is ordered.
+
+# Keyword Arguments
+
+- `dense`: Dense-row threshold multiplier used by the AMD quotient graph.
+
+# Returns
+
+A permutation `p` of `1:size(A, 1)` intended to reduce fill in `(A + A')[p, p]`.
+
+# Throws
+
+- `DimensionMismatch`: `A` is not square.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> p = amd_order_sym(sparse([2.0 1.0; 1.0 2.0]));
+
+julia> sort(p)
+2-element Vector{Int64}:
+ 1
+ 2
+```
 """
 function amd_order_sym(A::SparseMatrixCSC; dense::Real = 10.0)
     n = size(A, 2)
@@ -119,11 +148,37 @@ function amd_order_sym(A::SparseMatrixCSC; dense::Real = 10.0)
 end
 
 """
-    colamd_order(A::SparseMatrixCSC) -> Vector{Int}
+    colamd_order(A::SparseMatrixCSC; dense=10.0) -> Vector{Int}
 
-Column fill-reducing ordering for unsymmetric LU: AMD on the column-intersection
-graph (pattern of AᵀA with dense rows dropped), following CSparse `cs_amd(order=2)`.
-Returns a permutation of the columns of `A` suitable as the `q` argument to `gplu`.
+Compute a column fill-reducing order for unsymmetric LU by applying AMD to the
+column-intersection graph of `A' * A`.
+
+# Arguments
+
+- `A`: Sparse matrix whose columns are ordered.
+
+# Keyword Arguments
+
+- `dense`: Dense-row threshold multiplier used while constructing the
+  column-intersection graph.
+
+# Returns
+
+A one-based permutation of `1:size(A, 2)` suitable for the `q` keyword of
+[`gplu`](@ref).
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> p = colamd_order(sparse([1.0 0.0; 1.0 1.0; 0.0 1.0]));
+
+julia> sort(p)
+2-element Vector{Int64}:
+ 1
+ 2
+```
 """
 function colamd_order(A::SparseMatrixCSC; dense::Real = 10.0)
     n = size(A, 2)
