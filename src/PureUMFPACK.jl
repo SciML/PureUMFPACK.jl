@@ -9,12 +9,14 @@
 
 module PureUMFPACK
 
-using SparseArrays: SparseMatrixCSC, getcolptr, rowvals, nonzeros, nnz
+using SparseArrays: SparseMatrixCSC, rowvals, nonzeros, nnz
 using LinearAlgebra: SingularException, RowMaximum, UpperTriangular,
     UnitLowerTriangular, lu!, ldiv!, rdiv!, mul!
 
 export gplu, GPLUFactorization, solve, amd_order_sym, colamd_order, row_scaling,
     splu, PureLU, SCALE_NONE, SCALE_SUM, SCALE_MAX, multifrontal_lu
+
+@inline _colptr(A::SparseMatrixCSC) = getfield(A, :colptr)
 
 include("gplu.jl")
 include("solve.jl")

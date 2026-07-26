@@ -8,9 +8,32 @@
 """
     PureLU
 
-Pure-Julia sparse LU factorization. Satisfies `(F.Rs .* A)[F.p, F.q] == F.L * F.U`
-with `L` unit lower triangular and `U` upper triangular — the same convention as
-`SparseArrays.lu` (UMFPACK).
+High-level pure-Julia sparse LU factorization returned by [`splu`](@ref). It
+satisfies `(F.Rs .* A)[F.p, F.q] == F.L * F.U` with unit lower-triangular `L` and
+upper-triangular `U`.
+
+# Fields
+
+- `L`: Unit lower-triangular sparse factor in pivot order.
+- `U`: Upper-triangular sparse factor in pivot order.
+- `p`: Row permutation used by the factorization.
+- `q`: Column permutation used by the factorization.
+- `Rs`: Scaling vector applied to rows before factorization.
+- `A`: Original sparse matrix retained for iterative refinement.
+
+# Interfaces
+
+`PureLU` implements `Base.size` and `Base.\\`; `F \\ b` is equivalent to
+`solve(F, b)` with `refine=0`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> size(splu(sparse([2.0 1.0; 1.0 2.0])))
+(2, 2)
+```
 """
 struct PureLU{Tv, Ti <: Integer, Tr <: Real}
     L::SparseMatrixCSC{Tv, Ti}
@@ -27,15 +50,45 @@ Base.size(F::PureLU, i::Integer) = size(F)[i]
 """
     splu(A; method=:gplu, ordering=:amd, tol=0.1, scale=SCALE_SUM, check=true) -> PureLU
 
-Factorize sparse `A`.
+Factorize a square sparse matrix with the high-level PureUMFPACK interface.
 
-- `method` ∈ (`:gplu`, `:multifrontal`). `:gplu` is the robust Gilbert–Peierls
-  default (threshold partial pivoting, any unsymmetric matrix). `:multifrontal`
-  is the supernodal BLAS-3 kernel — much faster on 3D / dense-front problems, with
-  pivoting restricted to within each supernode (best for SPD / diagonally dominant
-  / structurally symmetric systems); it ignores `ordering` (uses AMD + postorder).
-- `ordering` ∈ (`:amd`, `:colamd`, `:natural`)  (`:gplu` only).
-- `scale` ∈ (`SCALE_SUM`, `SCALE_MAX`, `SCALE_NONE`); `tol` is the pivot threshold.
+# Arguments
+
+- `A`: Square sparse matrix to factorize.
+
+# Keyword Arguments
+
+- `method`: `:gplu` for robust Gilbert-Peierls LU on general unsymmetric matrices,
+  or `:multifrontal` for the supernodal dense-front kernel. The latter uses AMD plus
+  postordering and ignores `ordering`.
+- `ordering`: `:amd`, `:colamd`, or `:natural` column order for `method=:gplu`.
+- `tol`: Gilbert-Peierls pivot threshold in `[0, 1]`; see [`gplu`](@ref).
+- `scale`: Row scaling policy: [`SCALE_SUM`](@ref), [`SCALE_MAX`](@ref), or
+  [`SCALE_NONE`](@ref).
+- `check`: Whether to throw `SingularException` for a singular pivot.
+
+# Returns
+
+A [`PureLU`](@ref) that supports `size`, [`solve`](@ref), and `\\`.
+
+# Throws
+
+- `DimensionMismatch`: `A` is not square.
+- `ArgumentError`: `method` or `ordering` is not supported.
+- `SingularException`: a pivot is singular and `check=true`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> F = splu(sparse([2.0 1.0; 1.0 2.0]));
+
+julia> F \\ [1.0, 0.0]
+2-element Vector{Float64}:
+  0.6666666666666666
+ -0.3333333333333333
+```
 """
 function splu(
         A::SparseMatrixCSC{Tv, Ti}; method::Symbol = :gplu, ordering::Symbol = :amd,
@@ -87,9 +140,32 @@ end
 """
     solve(F::PureLU, b; refine=0) -> x
 
-Solve `A x = b` using the factorization (handles row scaling Rs). `refine` extra
-steps of iterative refinement (`x ← x + A⁻¹(b - A x)`) sharpen the result on
-ill-conditioned systems — the same accuracy mechanism UMFPACK applies by default.
+Solve `A * x = b` using a high-level [`PureLU`](@ref) factorization.
+
+# Arguments
+
+- `F`: Factorization returned by [`splu`](@ref).
+- `b`: Right-hand-side vector with `length(b) == size(F, 1)`.
+
+# Keyword Arguments
+
+- `refine`: Number of iterative-refinement steps. Each step solves the residual
+  equation with the existing factors.
+
+# Returns
+
+The solution vector in the original column order of `F.A`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> solve(splu(sparse([2.0 1.0; 1.0 2.0])), [1.0, 0.0]; refine = 1)
+2-element Vector{Float64}:
+  0.6666666666666666
+ -0.3333333333333333
+```
 """
 function solve(F::PureLU, b::AbstractVector; refine::Integer = 0)
     x = _solve_factor(F, b)

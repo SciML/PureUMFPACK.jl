@@ -106,9 +106,42 @@ end
 """
     multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, check=true) -> GPLUFactorization
 
-Supernodal multifrontal LU. Returns the same `GPLUFactorization` (`A[p,q]==L*U`)
-as [`gplu`](@ref), so it shares the triangular solves. `q` defaults to the AMD +
-postorder ordering from `symbolic_mf`.
+Compute a supernodal multifrontal sparse LU factorization. This method is designed
+for structurally symmetric, diagonally dominant, or SPD-like matrices where dense
+frontal BLAS operations are effective.
+
+# Arguments
+
+- `A`: Square sparse matrix to factorize.
+
+# Keyword Arguments
+
+- `q`: Optional one-based column order. When omitted, the package computes an AMD
+  plus postorder order from the symbolic analysis.
+- `tol`: Reserved for compatibility with the low-level factorization interface.
+- `check`: Whether to throw for a singular pivot.
+
+# Returns
+
+A [`GPLUFactorization`](@ref) satisfying `A[F.p, F.q] == F.L * F.U`.
+
+# Throws
+
+- `DimensionMismatch`: `A` is not square.
+- `SingularException`: a pivot is singular and `check=true`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> F = multifrontal_lu(sparse([2.0 1.0; 1.0 2.0]));
+
+julia> F \\ [1.0, 0.0]
+2-element Vector{Float64}:
+  0.6666666666666666
+ -0.3333333333333333
+```
 """
 function multifrontal_lu(
         A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
@@ -120,10 +153,10 @@ function multifrontal_lu(
     qf = S.qf
     V = A[qf, qf]
     Vt = copy(transpose(V))
-    Vp = getcolptr(V)
+    Vp = _colptr(V)
     Vi = rowvals(V)
     Vx = nonzeros(V)
-    Vtp = getcolptr(Vt)
+    Vtp = _colptr(Vt)
     Vti = rowvals(Vt)
     Vtx = nonzeros(Vt)
 

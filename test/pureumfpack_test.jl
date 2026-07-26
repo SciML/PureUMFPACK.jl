@@ -43,7 +43,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
         # row indices within each column must ascend, and the sorted factor must
         # equal the canonical form produced by a transpose-transpose round trip.
         colsorted(S) = all(
-            issorted(@view rowvals(S)[SparseArrays.getcolptr(S)[j]:(SparseArrays.getcolptr(S)[j + 1] - 1)])
+            issorted(@view rowvals(S)[S.colptr[j]:(S.colptr[j + 1] - 1)])
                 for j in 1:size(S, 2)
         )
         canon(S) = copy(transpose(copy(transpose(S))))

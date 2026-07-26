@@ -18,7 +18,8 @@ makedocs(;
         "Home" => "index.md",
         "API" => "api.md",
     ],
-    checkdocs = :exports
+    checkdocs = :exports,
+    doctest = true
 )
 
 deploydocs(;
