@@ -4,3 +4,4 @@ PureUMFPACK = "b7e1f0a2-3c4d-4e5f-9a0b-1c2d3e4f5a6b"
 
 [compat]
 Documenter = "1"
+PureUMFPACK = "0.1.3"
