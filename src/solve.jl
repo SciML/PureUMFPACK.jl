@@ -57,7 +57,7 @@ The solution vector `x` in the original column order of `A`.
 ```jldoctest
 julia> using PureUMFPACK, SparseArrays
 
-julia> solve(gplu(sparse([2.0 1.0; 1.0 2.0])), [1.0, 0.0])
+julia> PureUMFPACK.solve(gplu(sparse([2.0 1.0; 1.0 2.0])), [1.0, 0.0])
 2-element Vector{Float64}:
   0.6666666666666666
  -0.3333333333333333

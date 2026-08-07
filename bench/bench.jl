@@ -7,6 +7,7 @@
 # Reports factorization time, solve time, and fill (nnz(L)+nnz(U)).
 
 using PureUMFPACK
+using PureUMFPACK: solve
 using SparseArrays, LinearAlgebra, Printf, BenchmarkTools
 include(joinpath(@__DIR__, "matrices.jl"))
 

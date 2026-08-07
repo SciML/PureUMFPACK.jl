@@ -1,6 +1,7 @@
 # End-to-end comparison: pure-Julia splu (AMD + scaling + Gilbert-Peierls) vs UMFPACK.
 # Both timings include the full pipeline (ordering + numeric factorization).
 using PureUMFPACK
+using PureUMFPACK: solve
 using SparseArrays, LinearAlgebra, Printf, BenchmarkTools
 include(joinpath(@__DIR__, "matrices.jl"))
 

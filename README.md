@@ -42,8 +42,11 @@ A = sprand(10_000, 10_000, 5/10_000) + 10I
 b = randn(10_000)
 
 F = splu(A)                      # ordering=:amd, scale=SCALE_SUM, tol=0.1
-x = F \ b                        # or solve(F, b)
-x = solve(F, b; refine = 2)      # 2 steps of iterative refinement
+x = F \ b                        # or PureUMFPACK.solve(F, b)
+
+# `solve` is public but unexported (SciMLBase exports the same name); qualify it,
+# or bring it in with `using PureUMFPACK: solve`.
+x = PureUMFPACK.solve(F, b; refine = 2)   # 2 steps of iterative refinement
 
 F = splu(A; ordering = :colamd, tol = 1.0, scale = SCALE_MAX)
 

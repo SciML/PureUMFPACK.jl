@@ -1,4 +1,5 @@
 using PureUMFPACK
+using PureUMFPACK: solve
 using SparseArrays, LinearAlgebra, Printf, Profile
 include(joinpath(@__DIR__, "matrices.jl"))
 

@@ -13,8 +13,16 @@ using SparseArrays: SparseMatrixCSC, rowvals, nonzeros, nnz
 using LinearAlgebra: SingularException, RowMaximum, UpperTriangular,
     UnitLowerTriangular, lu!, ldiv!, rdiv!, mul!
 
-export gplu, GPLUFactorization, solve, amd_order_sym, colamd_order, row_scaling,
+export gplu, GPLUFactorization, amd_order_sym, colamd_order, row_scaling,
     splu, PureLU, SCALE_NONE, SCALE_SUM, SCALE_MAX, multifrontal_lu
+
+# `solve` is documented API but stays unexported because SciMLBase exports the same
+# name, so `using PureUMFPACK` alongside any SciML package would shadow `solve` and
+# break `solve(prob, alg)`. Reach it as `PureUMFPACK.solve`, or use `\`.
+# `public` requires Julia >= 1.11; on the 1.10 LTS this is a no-op.
+@static if VERSION >= v"1.11"
+    include_string(@__MODULE__, "public solve")
+end
 
 @inline _colptr(A::SparseMatrixCSC) = getfield(A, :colptr)
 

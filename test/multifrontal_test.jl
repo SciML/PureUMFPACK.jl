@@ -1,7 +1,7 @@
 # Supernodal multifrontal kernel: symbolic correctness, reconstruction, solve,
 # fill identity with GP-LU, and agreement with UMFPACK.
 using PureUMFPACK
-using PureUMFPACK: multifrontal_lu, symbolic_mf, predicted_fill, gplu
+using PureUMFPACK: multifrontal_lu, symbolic_mf, predicted_fill, gplu, solve
 using SparseArrays, LinearAlgebra, Random, Test
 include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
 Random.seed!(2024)
