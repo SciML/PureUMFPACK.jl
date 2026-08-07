@@ -1,6 +1,7 @@
 # Comprehensive component-level benchmark: pure-Julia pipeline vs UMFPACK.
 # Picks the better of AMD/COLAMD by fill; reports ordering vs numeric time, fill, solve.
 using PureUMFPACK
+using PureUMFPACK: solve
 using PureUMFPACK: amd_order_sym, colamd_order, row_scaling, apply_row_scaling, gplu,
     SCALE_SUM
 using SparseArrays, LinearAlgebra, Printf, BenchmarkTools

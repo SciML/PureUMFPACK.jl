@@ -1,4 +1,5 @@
 using PureUMFPACK
+using PureUMFPACK: solve
 using SparseArrays, LinearAlgebra, Random, Test
 include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
 
