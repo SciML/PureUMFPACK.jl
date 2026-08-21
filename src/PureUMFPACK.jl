@@ -9,7 +9,7 @@
 
 module PureUMFPACK
 
-using SparseArrays: SparseMatrixCSC, rowvals, nonzeros, nnz
+using SparseArrays: SparseMatrixCSC, rowvals, nonzeros, nnz, sparse
 using LinearAlgebra: SingularException, RowMaximum, UpperTriangular,
     UnitLowerTriangular, lu!, ldiv!, rdiv!, mul!
 
@@ -33,5 +33,19 @@ include("amd.jl")
 include("symbolic.jl")
 include("multifrontal.jl")
 include("interface.jl")
+
+using PrecompileTools: @compile_workload, @setup_workload
+
+@setup_workload begin
+    @compile_workload begin
+        A = sparse([2.0 1.0; 1.0 2.0])
+        b = [1.0, 0.0]
+        for F in (gplu(A), splu(A), multifrontal_lu(A))
+            size(F)
+            F \ b
+        end
+        solve(splu(A), b; refine = 1)
+    end
+end
 
 end # module
