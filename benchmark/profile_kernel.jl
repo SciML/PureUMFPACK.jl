@@ -39,7 +39,7 @@ Profile.init(n = 10^7, delay = 0.0005)
         gplu(A; tol = 0.1)
     end
 )
-open(joinpath(@__DIR__, "..", "results", "profile_flat.txt"), "w") do io
+open(joinpath(@__DIR__, "results", "profile_flat.txt"), "w") do io
     Profile.print(
         IOContext(io, :displaysize => (10000, 200));
         format = :flat, sortedby = :count, mincount = 15

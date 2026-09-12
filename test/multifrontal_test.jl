@@ -3,7 +3,7 @@
 using PureUMFPACK
 using PureUMFPACK: multifrontal_lu, symbolic_mf, predicted_fill, gplu, solve
 using SparseArrays, LinearAlgebra, Random, Test
-include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
+include(joinpath(@__DIR__, "..", "benchmark", "matrices.jl"))
 Random.seed!(2024)
 
 isperm1(p, n) = sort(p) == collect(1:n)

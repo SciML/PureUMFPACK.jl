@@ -1,6 +1,6 @@
 using PureUMFPACK, SparseArrays, LinearAlgebra, Printf
 import AMD
-include(joinpath(@__DIR__, "..", "bench", "matrices.jl"))
+include(joinpath(@__DIR__, "matrices.jl"))
 
 # Fill produced by the actual pure-Julia kernel under a symmetric ordering p,
 # using diagonal-preferring pivoting (tol=0) to reflect the ordering's quality.
