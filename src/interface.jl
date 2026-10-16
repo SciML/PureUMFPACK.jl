@@ -63,9 +63,8 @@ Factorize a square sparse matrix with the high-level PureUMFPACK interface.
   postordering and ignores `ordering`.
 - `ordering`: `:amd`, `:colamd`, or `:natural` column order for `method=:gplu`.
 - `tol`: Gilbert-Peierls pivot threshold in `[0, 1]`; see [`gplu`](@ref).
-- `relax`: (`method=:multifrontal` only) relaxes supernode amalgamation: `0`
-  keeps the fundamental partition with no extra fill; `relax > 0` allows up to
-  `relax` extra explicit entries per column to form fewer/larger dense fronts.
+- `relax`: Supernode amalgamation budget for `method=:multifrontal`; see
+  [`multifrontal_lu`](@ref). Ignored by `method=:gplu`.
 - `scale`: Row scaling policy: [`SCALE_SUM`](@ref), [`SCALE_MAX`](@ref), or
   [`SCALE_NONE`](@ref).
 - `check`: Whether to throw `SingularException` for a singular pivot.
@@ -77,7 +76,8 @@ A [`PureLU`](@ref) that supports `size`, [`solve`](@ref), and `\\`.
 # Throws
 
 - `DimensionMismatch`: `A` is not square.
-- `ArgumentError`: `method` or `ordering` is not supported.
+- `ArgumentError`: `method` or `ordering` is not supported, or `relax < 0` with
+  `method=:multifrontal`.
 - `SingularException`: a pivot is singular and `check=true`.
 
 # Examples

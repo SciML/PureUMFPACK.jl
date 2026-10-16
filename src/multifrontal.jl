@@ -119,9 +119,12 @@ frontal BLAS operations are effective.
 - `q`: Optional one-based column order. When omitted, the package computes an AMD
   plus postorder order from the symbolic analysis.
 - `tol`: Reserved for compatibility with the low-level factorization interface.
-- `relax`: Supernode amalgamation: `0` uses the fundamental partition with no extra
-  fill; `relax > 0` merges a child supernode into its parent when at most `relax`
-  extra explicit (structural-zero) entries per column would result.
+- `relax`: Relaxed supernode amalgamation budget, a nonnegative integer. `0` keeps
+  the fundamental supernode partition, which adds no fill. With `relax > 0`, a
+  chain of supernodes is merged into one larger dense front as long as every
+  column of `L` in the merged supernode, and the matching row of `U`, gains at
+  most `relax` explicitly stored entries over the `relax = 0` factor. Hence
+  `nnz(F.L)` and `nnz(F.U)` each grow by at most `relax * size(A, 2)`.
 - `check`: Whether to throw for a singular pivot.
 
 # Returns
@@ -131,6 +134,7 @@ A [`GPLUFactorization`](@ref) satisfying `A[F.p, F.q] == F.L * F.U`.
 # Throws
 
 - `DimensionMismatch`: `A` is not square.
+- `ArgumentError`: `relax < 0`.
 - `SingularException`: a pivot is singular and `check=true`.
 
 # Examples
