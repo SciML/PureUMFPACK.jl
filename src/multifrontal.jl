@@ -38,15 +38,16 @@
 # otherwise grew to 13–35% of runtime on large 3D problems — negligible.
 #
 # Threading (opt-in via `threaded=true`): the elimination tree's independent
-# subtrees have no data dependence, so each can be factored on its own task with a
-# *private* front workspace and a *private* contribution-block arena (the shared
-# `Fbuf`/`cbval` assume strict serial postorder and are NOT thread-safe).  The
-# upper tree near the root — where fronts are large and parallelism is scarce — is
-# done on the original serial path.  To make the threaded result *bit-identical* to
-# the serial one (and race-free) the CSC scatter uses precomputed deterministic
-# write offsets (`uupdoff`) instead of a shared running cursor, so a supernode's
-# entries land in exactly the slots serial postorder would have used regardless of
-# which task writes them or when.
+# subtrees have no data dependence, so a bounded pool of worker tasks factors them
+# concurrently, each worker with a *private* front workspace and scatter map and each
+# subtree with a *private* contribution-block arena (the shared `Fbuf`/`cbval`
+# assume strict serial postorder and are NOT thread-safe).  The upper tree near the
+# root — where fronts are large and parallelism is scarce — is done on the original
+# serial path.  To make the threaded result *bit-identical* to the serial one (and
+# race-free) the CSC scatter uses precomputed deterministic write offsets
+# (`uupdoff`) instead of a shared running cursor, so a supernode's entries land in
+# exactly the slots serial postorder would have used regardless of which task writes
+# them or when.
 
 # Extend-add a child's contribution block into the parent front `F`.  The CB is an
 # m×m dense Schur block stored column-major in arena `cbval` starting at 0-based
@@ -122,8 +123,10 @@ end
 # where supernode `sk` writes its rows for its t-th update column.  Reproducing the
 # serial layout exactly makes the per-supernode scatter independent of execution
 # order, hence race-free under threading and bit-identical to the serial result.
-function _uupdate_offsets(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
-        Ucolptr::Vector{Ti}, n::Int) where {Ti}
+function _uupd_offsets(
+        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+        Ucolptr::Vector{Ti}, n::Int
+    ) where {Ti}
     nsuper = length(sstart) - 1
     uupdptr = Vector{Int}(undef, nsuper + 1)
     uupdptr[1] = 1
@@ -156,7 +159,8 @@ end
 # arena mutation is this supernode pushing its own CB, and reads of children CBs,
 # which the caller sequences via the elimination-tree dependence.  Returns nothing;
 # `cbtop` bookkeeping for the LIFO arena is the caller's (it knows the order).
-@inline function _factor_super!(sk::Int, c1::Int, c2::Int,
+@inline function _factor_super!(
+        sk::Int, c1::Int, c2::Int,
         loc::Vector{Int}, prow::Vector{Int},
         Vp, Vi, Vx, Vtp, Vti, Vtx, sstart::Vector{Int},
         colstruct::Vector{Vector{Int}}, childsupers::Vector{Vector{Int}},
@@ -164,7 +168,8 @@ end
         cbarena::Vector{Vector{Tv}},
         Lcolptr::Vector{Ti}, Lrowval::Vector{Ti}, Lnzval::Vector{Tv},
         Ucolptr::Vector{Ti}, Urowval::Vector{Ti}, Unzval::Vector{Tv},
-        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool) where {Tv, Ti}
+        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool
+    ) where {Tv, Ti}
     np = c2 - c1 + 1
     upd = colstruct[c2]                   # rows > c2 (sorted), shared by block
     nu = length(upd)
@@ -395,7 +400,7 @@ function multifrontal_lu(
     Lnzval = Vector{Tv}(undef, Lcolptr[n + 1] - 1)
     Urowval = Vector{Ti}(undef, Ucolptr[n + 1] - 1)   # U rows in factor/elim coords
     Unzval = Vector{Tv}(undef, Ucolptr[n + 1] - 1)
-    uupdptr, uupdoff = _uupdate_offsets(sstart, colstruct, Ucolptr, n)
+    uupdptr, uupdoff = _uupd_offsets(sstart, colstruct, Ucolptr, n)
 
     # Per-supernode CB location: which arena holds it, and the 0-based offset there.
     # `cbarena` is fully initialized to one shared empty vector (NOT left `#undef`):
@@ -409,21 +414,25 @@ function multifrontal_lu(
     use_threads = threaded && Threads.nthreads() > 1 && n >= parallel_threshold
 
     if use_threads
-        _factor_threaded!(sstart, colstruct, childsupers, nsuper, n, maxnf,
+        _factor_threaded!(
+            sstart, colstruct, childsupers, nsuper, n, maxnf,
             prow, Vp, Vi, Vx, Vtp, Vti, Vtx,
             cboff, cbarena, Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval, Unzval,
-            uupdptr, uupdoff, check)
+            uupdptr, uupdoff, check
+        )
     else
         Fbuf = Matrix{Tv}(undef, maxnf, maxnf)
         cbval = Vector{Tv}(undef, max(64, maxnf * maxnf))
         loc = zeros(Int, n)
         cbtop = 0
         @inbounds for sk in 1:nsuper
-            cbtop = _factor_super!(sk, sstart[sk], sstart[sk + 1] - 1,
+            cbtop = _factor_super!(
+                sk, sstart[sk], sstart[sk + 1] - 1,
                 loc, prow, Vp, Vi, Vx, Vtp, Vti, Vtx, sstart,
                 colstruct, childsupers, Fbuf, cbval, cboff, cbtop, cbarena,
                 Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval, Unzval,
-                uupdptr, uupdoff, check)
+                uupdptr, uupdoff, check
+            )
         end
     end
 
@@ -443,18 +452,21 @@ function multifrontal_lu(
 end
 
 # Threaded driver.  Choose a frontier of subtree roots whose subtrees are factored
-# concurrently (each on a private front workspace + private CB arena), then factor
-# the remaining upper supernodes serially on the shared workspace.  Independent
+# concurrently by a bounded worker pool (private front workspace + scatter map per
+# worker, private CB arena per subtree), then factor the remaining upper supernodes
+# serially on the shared workspace.  Independent
 # subtrees touch disjoint pivot columns and the CSC scatter uses precomputed
 # offsets, so the only cross-task interaction is a parent reading a child CB —
 # never within one parallel level, and the serial upper tree runs after the join.
-function _factor_threaded!(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+function _factor_threaded!(
+        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
         childsupers::Vector{Vector{Int}}, nsuper::Int, n::Int, maxnf::Int,
         prow::Vector{Int}, Vp, Vi, Vx, Vtp, Vti, Vtx,
         cboff::Vector{Int}, cbarena::Vector{Vector{Tv}},
         Lcolptr::Vector{Ti}, Lrowval::Vector{Ti}, Lnzval::Vector{Tv},
         Ucolptr::Vector{Ti}, Urowval::Vector{Ti}, Unzval::Vector{Tv},
-        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool) where {Tv, Ti}
+        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool
+    ) where {Tv, Ti}
     # parent supernode of each supernode (0 = root): parent of sk is the owner of
     # the column that sk's last column elim-points to, recovered from childsupers.
     parent = zeros(Int, nsuper)
@@ -503,21 +515,58 @@ function _factor_threaded!(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
     roots = findall(isroot)
     # order subtree roots largest-first for better load balance
     sort!(roots; by = sk -> subsize[sk], rev = true)
+    nroots = length(roots)
 
-    # Factor each chosen subtree concurrently, each with a private workspace + arena.
+    # Lay out every chosen subtree's postorder in one array (`rootptr` delimits each
+    # root's segment) and record, per subtree, the exact peak of its LIFO arena.
+    rootptr = Vector{Int}(undef, nroots + 1)
+    rootptr[1] = 1
+    @inbounds for i in 1:nroots
+        rootptr[i + 1] = rootptr[i] + subsize[roots[i]]
+    end
+    order = Vector{Int}(undef, rootptr[nroots + 1] - 1)
+    cbpeak = Vector{Int}(undef, nroots)
+    cutnf = 0
+    @inbounds for i in 1:nroots
+        _subtree_postorder!(order, rootptr[i] - 1, childsupers, roots[i])
+        top = 0
+        peak = 0
+        for k in rootptr[i]:(rootptr[i + 1] - 1)
+            sk = order[k]
+            for ck in childsupers[sk]
+                top -= length(colstruct[sstart[ck + 1] - 1])^2
+            end
+            nu = length(colstruct[sstart[sk + 1] - 1])
+            top += nu * nu
+            peak = max(peak, top)
+            cutnf = max(cutnf, (sstart[sk + 1] - sstart[sk]) + nu)
+        end
+        cbpeak[i] = peak
+    end
+
+    # A bounded pool of workers, each owning one front workspace and one scatter map,
+    # claims subtrees largest-first from a shared counter, so workspace memory scales
+    # with the thread count rather than with the number of subtrees.
     # NOTE: BLAS thread count is deliberately left untouched here.  Toggling
     # `BLAS.set_num_threads` from the main task while the spawned worker tasks are
     # mid-`getrf`/`gemm` reallocates OpenBLAS's per-thread internal buffers and
     # corrupts those in-flight calls (a nondeterministic numeric race).  Measuring
     # tree parallelism wants BLAS=1, but that is the caller's responsibility (set it
     # before calling); it must not be flipped underneath running BLAS.
-    @sync begin
-        for r in roots
-            Threads.@spawn _factor_subtree!(r, sstart, colstruct, childsupers,
-                subsize[r], prow, Vp, Vi, Vx, Vtp, Vti, Vtx,
+    next = Threads.Atomic{Int}(1)
+    try
+        @sync for _ in 1:min(nthr, nroots)
+            Threads.@spawn _factor_worker!(
+                next, roots, rootptr, order, cbpeak,
+                cutnf, sstart, colstruct, childsupers, prow, Vp, Vi, Vx, Vtp, Vti, Vtx,
                 cboff, cbarena, Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval,
-                Unzval, uupdptr, uupdoff, check, n)
+                Unzval, uupdptr, uupdoff, check, n
+            )
         end
+    catch err
+        err isa CompositeException || rethrow()
+        inner = first(err.exceptions)
+        throw(inner isa TaskFailedException ? inner.task.exception : inner)
     end
 
     # serial upper tree: every supernode not inside a chosen subtree, in postorder.
@@ -527,11 +576,13 @@ function _factor_threaded!(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
     cbtop = 0
     @inbounds for sk in 1:nsuper
         incut[sk] && continue
-        cbtop = _factor_super!(sk, sstart[sk], sstart[sk + 1] - 1,
+        cbtop = _factor_super!(
+            sk, sstart[sk], sstart[sk + 1] - 1,
             loc, prow, Vp, Vi, Vx, Vtp, Vti, Vtx, sstart,
             colstruct, childsupers, Fbuf, cbval, cboff, cbtop, cbarena,
             Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval, Unzval,
-            uupdptr, uupdoff, check)
+            uupdptr, uupdoff, check
+        )
     end
     return nothing
 end
@@ -549,52 +600,51 @@ function _mark_subtree!(incut::BitVector, childsupers::Vector{Vector{Int}}, r::I
     return nothing
 end
 
-# Factor the subtree rooted at `r` on a private front workspace + private CB arena,
-# in postorder (descendants before ancestors), exactly as the serial kernel would
-# for that chunk.  The root's CB is left in this private arena for the serial upper
-# tree to absorb (recorded via cboff/cbarena).  Sized to the subtree's own largest
-# front to keep per-task memory proportional to its work.
-function _factor_subtree!(r::Int, sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
-        childsupers::Vector{Vector{Int}}, subn::Int,
+# One worker of the threaded driver: repeatedly claim the next unclaimed subtree and
+# factor it in postorder, exactly as the serial kernel would for that chunk.  The
+# front workspace `Fbuf` (sized to the largest front in any chosen subtree) and the
+# scatter map `loc` are reused across this worker's subtrees.  Each subtree gets its
+# own CB arena, pre-sized to that subtree's LIFO peak so it never grows, because its
+# root's CB must stay in place for the serial upper tree to absorb after the join.
+function _factor_worker!(
+        next::Threads.Atomic{Int}, roots::Vector{Int},
+        rootptr::Vector{Int}, order::Vector{Int}, cbpeak::Vector{Int}, cutnf::Int,
+        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+        childsupers::Vector{Vector{Int}},
         prow::Vector{Int}, Vp, Vi, Vx, Vtp, Vti, Vtx,
         cboff::Vector{Int}, cbarena::Vector{Vector{Tv}},
         Lcolptr::Vector{Ti}, Lrowval::Vector{Ti}, Lnzval::Vector{Tv},
         Ucolptr::Vector{Ti}, Urowval::Vector{Ti}, Unzval::Vector{Tv},
-        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool, n::Int) where {Tv, Ti}
-    # supernodes of this subtree in postorder (children before parent)
-    order = Vector{Int}(undef, subn)
-    _subtree_postorder!(order, childsupers, r)
-
-    # largest front within this subtree, and the total CB storage it can ever hold.
-    # Pre-size the arena to that upper bound so the per-task LIFO never has to `resize!`
-    # mid-loop; the LIFO peak is ≤ this sum, so one allocation suffices.
-    lnf = 0
-    cbcap = 0
-    @inbounds for sk in order
-        nu = length(colstruct[sstart[sk + 1] - 1])
-        nfk = (sstart[sk + 1] - sstart[sk]) + nu
-        nfk > lnf && (lnf = nfk)
-        cbcap += nu * nu
-    end
-    Fbuf = Matrix{Tv}(undef, lnf, lnf)
-    cbval = Vector{Tv}(undef, max(64, cbcap))
+        uupdptr::Vector{Int}, uupdoff::Vector{Int}, check::Bool, n::Int
+    ) where {Tv, Ti}
+    Fbuf = Matrix{Tv}(undef, cutnf, cutnf)
     loc = zeros(Int, n)
-    cbtop = 0
-    @inbounds for sk in order
-        cbtop = _factor_super!(sk, sstart[sk], sstart[sk + 1] - 1,
-            loc, prow, Vp, Vi, Vx, Vtp, Vti, Vtx, sstart,
-            colstruct, childsupers, Fbuf, cbval, cboff, cbtop, cbarena,
-            Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval, Unzval,
-            uupdptr, uupdoff, check)
+    while true
+        i = Threads.atomic_add!(next, 1)
+        i > length(roots) && break
+        cbval = Vector{Tv}(undef, cbpeak[i])
+        cbtop = 0
+        @inbounds for k in rootptr[i]:(rootptr[i + 1] - 1)
+            sk = order[k]
+            cbtop = _factor_super!(
+                sk, sstart[sk], sstart[sk + 1] - 1,
+                loc, prow, Vp, Vi, Vx, Vtp, Vti, Vtx, sstart,
+                colstruct, childsupers, Fbuf, cbval, cboff, cbtop, cbarena,
+                Lcolptr, Lrowval, Lnzval, Ucolptr, Urowval, Unzval,
+                uupdptr, uupdoff, check
+            )
+        end
     end
     return nothing
 end
 
-# Fill `order` with the postorder of the subtree rooted at `r` (children, in the
-# same ascending order the serial kernel uses, before their parent).  Iterative to
-# avoid deep recursion on tall trees.
-function _subtree_postorder!(order::Vector{Int}, childsupers::Vector{Vector{Int}}, r::Int)
-    k = 0
+# Write the postorder of the subtree rooted at `r` (children, in the same ascending
+# order the serial kernel uses, before their parent) into `order[k0+1:k0+size]`.
+# Iterative to avoid deep recursion on tall trees.
+function _subtree_postorder!(
+        order::Vector{Int}, k0::Int, childsupers::Vector{Vector{Int}}, r::Int
+    )
+    k = k0
     stack = Tuple{Int, Int}[(r, 0)]           # (supernode, next-child index)
     @inbounds while !isempty(stack)
         sk, ci = pop!(stack)

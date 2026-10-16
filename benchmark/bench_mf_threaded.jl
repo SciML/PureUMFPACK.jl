@@ -29,14 +29,18 @@ end
 
 function main()
     sizes = (30, 36)
-    println("multifrontal tree parallelism  (REPS=$REPS, 1 BLAS thread, ",
-        Threads.nthreads(), " Julia threads)")
-    println(rpad("k", 5), rpad("n", 9), rpad("serial(s)", 12), rpad("threaded(s)", 13),
-        rpad("umf(s)", 12), rpad("ser/thr", 9), rpad("thr/umf", 9), rpad("ident", 7), "residual")
+    println(
+        "multifrontal tree parallelism  (REPS=$REPS, 1 BLAS thread, ",
+        Threads.nthreads(), " Julia threads)"
+    )
+    println(
+        rpad("k", 5), rpad("n", 9), rpad("serial(s)", 12), rpad("threaded(s)", 13),
+        rpad("umf(s)", 12), rpad("speedup", 9), rpad("vs umf", 9), rpad("ident", 7), "residual"
+    )
     for k in sizes
         A = poisson3d(k)
-        ser = bestfactor(() -> multifrontal_lu(A; threaded = false), REPS)
-        thr = bestfactor(() -> multifrontal_lu(A; threaded = true), REPS)
+        t_serial = bestfactor(() -> multifrontal_lu(A; threaded = false), REPS)
+        t_threaded = bestfactor(() -> multifrontal_lu(A; threaded = true), REPS)
         umf = bestfactor(() -> lu(A), REPS)
         Fs = multifrontal_lu(A; threaded = false)
         Ft = multifrontal_lu(A; threaded = true)
@@ -45,11 +49,14 @@ function main()
         b = randn(n)
         x = solve(PureLU(Ft.L, Ft.U, Ft.p, Ft.q, ones(n), A), b)
         res = norm(A * x - b) / norm(b)
-        println(rpad(k, 5), rpad(n, 9), rpad(round(ser, digits = 4), 12),
-            rpad(round(thr, digits = 4), 13), rpad(round(umf, digits = 4), 12),
-            rpad(round(ser / thr, digits = 3), 9), rpad(round(thr / umf, digits = 3), 9),
-            rpad(ident, 7), round(res, sigdigits = 3))
+        println(
+            rpad(k, 5), rpad(n, 9), rpad(round(t_serial, digits = 4), 12),
+            rpad(round(t_threaded, digits = 4), 13), rpad(round(umf, digits = 4), 12),
+            rpad(round(t_serial / t_threaded, digits = 3), 9), rpad(round(t_threaded / umf, digits = 3), 9),
+            rpad(ident, 7), round(res, sigdigits = 3)
+        )
     end
+    return
 end
 
 main()
