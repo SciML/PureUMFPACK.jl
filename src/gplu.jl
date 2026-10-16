@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse cs_lu, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Gilbert–Peierls left-looking sparse LU with partial (threshold) pivoting.
 #
 # This is the exact, unblocked numeric kernel: for each column k it solves the
@@ -11,8 +15,32 @@
 """
     GPLUFactorization
 
-Raw output of [`gplu`](@ref): `A[p, q] == L * U`, `L` unit lower triangular,
-`U` upper triangular.  `pinv` is the inverse row permutation (`pinv[p[k]] == k`).
+The raw Gilbert-Peierls factorization returned by [`gplu`](@ref). It satisfies
+`A[p, q] == L * U`, where `L` is unit lower triangular and `U` is upper triangular.
+
+# Fields
+
+- `L`: Unit lower-triangular sparse factor in pivot order.
+- `U`: Upper-triangular sparse factor in pivot order.
+- `p`: Row permutation such that row `p[k]` of `A` is pivot row `k`.
+- `q`: Column permutation selected for the factorization.
+- `pinv`: Inverse row permutation, satisfying `pinv[p[k]] == k`.
+
+# Interfaces
+
+`GPLUFactorization` implements `Base.size` and `Base.\\`; `F \\ b` solves the
+factored system in the original column order.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> F = gplu(sparse([2.0 1.0; 1.0 2.0]));
+
+julia> F.L * F.U == sparse([2.0 1.0; 1.0 2.0])[F.p, F.q]
+true
+```
 """
 struct GPLUFactorization{Tv, Ti <: Integer}
     L::SparseMatrixCSC{Tv, Ti}
@@ -21,6 +49,9 @@ struct GPLUFactorization{Tv, Ti <: Integer}
     q::Vector{Ti}      # column permutation: column q[k] of A is factored at step k
     pinv::Vector{Ti}   # inverse of p
 end
+
+Base.size(F::GPLUFactorization) = (size(F.L, 1), size(F.U, 2))
+Base.size(F::GPLUFactorization, i::Integer) = size(F)[i]
 
 @inline function _grow2!(a::Vector, b::Vector)
     newcap = 2 * length(a)
@@ -36,9 +67,11 @@ end
 # once it has become a pivot, i.e. when `pinv[j] >= 1`; then its neighbours are
 # the row indices stored in column `pinv[j]` of the partial L.  Finished nodes
 # are written to `xi[top..n]` in reverse-finish (topological) order.
-@inline function _dfs!(j0::Ti, Lp, Li, pinv, top::Ti,
+@inline function _dfs!(
+        j0::Ti, Lp, Li, pinv, top::Ti,
         xi::Vector{Ti}, stack::Vector{Ti}, pstack::Vector{Ti},
-        marked::Vector{Bool}) where {Ti}
+        marked::Vector{Bool}
+    ) where {Ti}
     head = 1
     stack[1] = j0
     @inbounds while head >= 1
@@ -75,9 +108,11 @@ end
 
 # Reach(A(:,col)) in the graph of L, returned as the topologically ordered slice
 # xi[top..n].  Leaves `marked` all-false on exit.
-@inline function _reach!(Lp, Li, Ap, Ai, col::Ti, pinv,
+@inline function _reach!(
+        Lp, Li, Ap, Ai, col::Ti, pinv,
         xi::Vector{Ti}, stack::Vector{Ti}, pstack::Vector{Ti},
-        marked::Vector{Bool}, n::Ti) where {Ti}
+        marked::Vector{Bool}, n::Ti
+    ) where {Ti}
     top = n + one(Ti)
     @inbounds for p in Ap[col]:(Ap[col + 1] - 1)
         b = Ai[p]
@@ -92,23 +127,59 @@ end
 end
 
 """
-    gplu(A::SparseMatrixCSC; q=1:size(A,2), tol=0.1, check=true, sort_factors=true)
+    gplu(A::SparseMatrixCSC; q=1:size(A, 2), tol=0.1, check=true, sort_factors=true)
 
-Pure-Julia Gilbert–Peierls left-looking LU with threshold partial pivoting.
-`q` is the (fill-reducing) column permutation; `tol ∈ [0,1]` is the pivot
-threshold (1.0 = strict partial pivoting, 0.0 = pure diagonal-preferring).
-`sort_factors=false` skips sorting row indices within columns — the factors still
-solve correctly (the unit/diagonal entries stay positioned) but are not in the
-canonical sorted CSC form.
+Compute a pure-Julia Gilbert-Peierls left-looking sparse LU factorization with
+threshold partial pivoting.
+
+# Arguments
+
+- `A`: Square sparse matrix to factorize.
+
+# Keyword Arguments
+
+- `q`: A one-based permutation of `1:size(A, 2)` selecting the factorization
+  column order. The natural order is used by default.
+- `tol`: Pivot threshold in `[0, 1]`. `1` chooses strict partial pivoting and `0`
+  always prefers an available diagonal pivot.
+- `check`: Whether to throw `SingularException` for a structurally singular pivot.
+- `sort_factors`: Whether to return factors in canonical CSC row order. Disabling
+  sorting preserves the solve relation but leaves row indices unsorted.
+
+# Returns
+
+A [`GPLUFactorization`](@ref) satisfying `A[F.p, F.q] == F.L * F.U`.
+
+# Throws
+
+- `DimensionMismatch`: `A` is not square.
+- `SingularException`: a pivot is singular and `check=true`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> A = sparse([2.0 1.0; 1.0 2.0]);
+
+julia> F = gplu(A; tol = 1.0);
+
+julia> F \\ [1.0, 0.0]
+2-element Vector{Float64}:
+  0.6666666666666666
+ -0.3333333333333333
+```
 """
 function gplu(
-        A::SparseMatrixCSC{Tv, Ti}; q::AbstractVector{<:Integer} = Base.OneTo(size(A, 2)),
-        tol::Real = 0.1, check::Bool = true, sort_factors::Bool = true) where {
-        Tv, Ti <: Integer}
+        A::SparseMatrixCSC{Tv, Ti}; q::AbstractVector{<:Integer} = 1:size(A, 2),
+        tol::Real = 0.1, check::Bool = true, sort_factors::Bool = true
+    ) where {
+        Tv, Ti <: Integer,
+    }
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("gplu requires a square matrix"))
     qv = collect(Ti, q)
-    Ap = getcolptr(A)
+    Ap = _colptr(A)
     Ai = rowvals(A)
     Ax = nonzeros(A)
 
@@ -309,7 +380,7 @@ end
 # Genuinely allocation-free: scratch sized to the longest column allocated once,
 # hybrid insertion (short columns) / merge sort (long columns), no per-call alloc.
 function _sortcols(S::SparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
-    cp = getcolptr(S)
+    cp = _colptr(S)
     ri = rowvals(S)
     nz = nonzeros(S)
     n = size(S, 2)

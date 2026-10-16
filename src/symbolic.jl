@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Symbolic analysis for the supernodal multifrontal factorization.
 #
 # Pipeline (all on the symmetric pattern of A + Aᵀ):
@@ -12,7 +16,7 @@ function _sym_csc1(A::SparseMatrixCSC)
     Pat = _patmat(A)
     S = Pat + copy(transpose(Pat))            # sorted CSC
     n = size(S, 2)
-    Sp = getcolptr(S)
+    Sp = _colptr(S)
     Si = rowvals(S)
     cp = Vector{Int}(undef, n + 1)
     cp[1] = 1
@@ -172,7 +176,7 @@ function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int
     nsuper = 0
     @inbounds for j in 1:n
         cont = j > 1 && parent[j - 1] == j && nchild[j] == 1 &&
-               colcount[j - 1] == colcount[j] + 1
+            colcount[j - 1] == colcount[j] + 1
         if !cont
             nsuper += 1
             push!(sstart, j)

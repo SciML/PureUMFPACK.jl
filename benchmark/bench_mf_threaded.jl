@@ -3,12 +3,12 @@
 # fixed RNG.  BLAS is pinned to one thread so the comparison measures TREE
 # parallelism, not nested BLAS.  Run under several Julia threads, e.g.:
 #
-#   julia -t 8 --project=. bench/bench_mf_threaded.jl
+#   julia -t 8 --project=. benchmark/bench_mf_threaded.jl
 #
 # The threaded factor is bit-for-bit identical to the serial one (same fronts,
 # same BLAS calls, same extend-add order); `ident` confirms it per case.
 using PureUMFPACK
-using PureUMFPACK: multifrontal_lu
+using PureUMFPACK: multifrontal_lu, solve
 using SparseArrays, LinearAlgebra, Random
 include(joinpath(@__DIR__, "matrices.jl"))
 

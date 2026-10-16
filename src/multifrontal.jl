@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2005-2023 Timothy A. Davis (UMFPACK, SuiteSparse) -- GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Supernodal multifrontal LU — the UMFPACK-style dense-front algorithm.
 #
 # Factorizes V = A[qf,qf] (qf from `symbolic_mf`) over its structurally-symmetric
@@ -49,8 +53,10 @@
 # offset `off`; its rows/cols are the global ids in `rows` (= the child's update
 # set, aliased from `colstruct`).  Function barrier keeps this O(m²) hot loop fully
 # typed for whatever concrete `F` (a Matrix view) is passed.
-@inline function _extend_add!(F::AbstractMatrix{Tv}, loc::Vector{Int}, rows,
-        cbval::Vector{Tv}, off::Int, m::Int) where {Tv}
+@inline function _extend_add!(
+        F::AbstractMatrix{Tv}, loc::Vector{Int}, rows,
+        cbval::Vector{Tv}, off::Int, m::Int
+    ) where {Tv}
     @inbounds for s in 1:m
         cs = loc[rows[s]]
         base = off + (s - 1) * m
@@ -75,8 +81,10 @@ end
 #               supernode whose update set contains J, that supernode's whole pivot
 #               column range.  Counted by scattering each supernode's pivot count
 #               np onto its update columns, plus the triangular own part.
-function _factor_colptrs(sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
-        n::Int, ::Type{Ti}) where {Ti}
+function _factor_colptrs(
+        sstart::Vector{Int}, colstruct::Vector{Vector{Int}},
+        n::Int, ::Type{Ti}
+    ) where {Ti}
     nsuper = length(sstart) - 1
     Lcolptr = Vector{Ti}(undef, n + 1)
     Ucolptr = Vector{Ti}(undef, n + 1)
@@ -306,29 +314,64 @@ end
     multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, check=true,
                     threaded=false, parallel_threshold=4096) -> GPLUFactorization
 
-Supernodal multifrontal LU. Returns the same `GPLUFactorization` (`A[p,q]==L*U`)
-as [`gplu`](@ref), so it shares the triangular solves. `q` defaults to the AMD +
-postorder ordering from [`symbolic_mf`](@ref).
+Compute a supernodal multifrontal sparse LU factorization. This method is designed
+for structurally symmetric, diagonally dominant, or SPD-like matrices where dense
+frontal BLAS operations are effective.
 
-`threaded=true` factors independent subtrees of the elimination tree concurrently
-on Julia threads (each with a private front workspace and contribution-block
-arena), falling back to the serial path for the upper tree near the root.  It is
-only engaged when `Threads.nthreads() > 1` and `size(A,2) ≥ parallel_threshold`,
-and produces output bit-identical to the serial path.  Serial is the default.
+# Arguments
+
+- `A`: Square sparse matrix to factorize.
+
+# Keyword Arguments
+
+- `q`: Optional one-based column order. When omitted, the package computes an AMD
+  plus postorder order from the symbolic analysis.
+- `tol`: Reserved for compatibility with the low-level factorization interface.
+- `check`: Whether to throw for a singular pivot.
+- `threaded`: Factor independent subtrees of the elimination tree concurrently on
+  Julia threads, each worker with a private front workspace and contribution-block
+  arena; the upper tree near the root runs serially. Engaged only when
+  `Threads.nthreads() > 1` and `size(A, 2) ≥ parallel_threshold`. The result is
+  bit-identical to the serial path.
+- `parallel_threshold`: Minimum matrix dimension for `threaded=true` to take effect.
+
+# Returns
+
+A [`GPLUFactorization`](@ref) satisfying `A[F.p, F.q] == F.L * F.U`.
+
+# Throws
+
+- `DimensionMismatch`: `A` is not square.
+- `SingularException`: a pivot is singular and `check=true`.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> F = multifrontal_lu(sparse([2.0 1.0; 1.0 2.0]));
+
+julia> F \\ [1.0, 0.0]
+2-element Vector{Float64}:
+  0.6666666666666666
+ -0.3333333333333333
+```
 """
-function multifrontal_lu(A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
+function multifrontal_lu(
+        A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
         check::Bool = true, threaded::Bool = false,
-        parallel_threshold::Integer = 4096) where {Tv, Ti <: Integer}
+        parallel_threshold::Integer = 4096
+    ) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("multifrontal_lu requires a square matrix"))
     S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)
     qf = S.qf
     V = A[qf, qf]
     Vt = copy(transpose(V))
-    Vp = getcolptr(V)
+    Vp = _colptr(V)
     Vi = rowvals(V)
     Vx = nonzeros(V)
-    Vtp = getcolptr(Vt)
+    Vtp = _colptr(Vt)
     Vti = rowvals(Vt)
     Vtx = nonzeros(Vt)
 

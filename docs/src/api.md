@@ -26,3 +26,12 @@ gplu
 GPLUFactorization
 multifrontal_lu
 ```
+
+## Scaling
+
+```@docs
+SCALE_NONE
+SCALE_SUM
+SCALE_MAX
+row_scaling
+```

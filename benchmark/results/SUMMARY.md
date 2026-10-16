@@ -1,12 +1,12 @@
 # PureUMFPACK — verified results
 
 Every number below was produced by running the code and reading the on-disk logs
-in `results/` (AMD EPYC 7502, Julia 1.12, single-threaded BLAS). UMFPACK = the C
+in `benchmark/results/` (AMD EPYC 7502, Julia 1.12, single-threaded BLAS). UMFPACK = the C
 library behind `SparseArrays.lu`. The machine is shared with other workloads, so
 factor-time *ratios* carry ≈±20% run-to-run noise; fill counts and residuals are
 exact and reproducible.
 
-## Correctness — test/runtests.jl  (results/runtests.log)
+## Correctness — test/runtests.jl  (benchmark/results/runtests.log)
 
 **206 / 206 tests pass** (140 core + 11 type-generality + 55 multifrontal). Coverage:
 - multifrontal: symbolic-fill == numeric-fill, reconstruction `A[p,q]=LU` to ~1e-16,
@@ -23,7 +23,7 @@ exact and reproducible.
 - agreement with UMFPACK's solution (≤1e-7)
 - iterative refinement; n=1 / diagonal edge cases
 
-## Ordering quality — pure-Julia AMD vs SuiteSparse AMD (test/amd_test.jl, results/amd_test.log)
+## Ordering quality — pure-Julia AMD vs SuiteSparse AMD (test/amd_test.jl, benchmark/results/amd_test.log)
 
 Fill of `gplu((A+Aᵀ)[p,p])`, `p` from my AMD vs the `AMD` package (ccall reference):
 
@@ -41,7 +41,7 @@ Fill of `gplu((A+Aᵀ)[p,p])`, `p` from my AMD vs the `AMD` package (ccall refer
 → **Exact match** to SuiteSparse AMD (marginally better on random). Independently
 reconfirmed by 3 separate AMD ports run in a workflow (best port also ratio 1.0).
 
-## Comprehensive benchmark — bench/bench_full.jl  (results/bench_full.log)
+## Comprehensive benchmark — benchmark/bench_full.jl  (benchmark/results/bench_full.log)
 
 Ratios to UMFPACK; `numfx` = numeric-only factor ÷ UMFPACK full factor; `totalx`
 includes ordering; `solvex` = solve ÷ UMFPACK solve. `best` auto-selects the
@@ -61,15 +61,15 @@ arrowband-5k   5000    57968    | 0.01445  69958     | 0.001808 0.001669 69958  
 Notes: fill matches UMFPACK exactly on every structured case; on `rand-5k-d10`
 PureUMFPACK's fill is **0.80×** UMFPACK's (10.9M vs 13.7M). The **triangular solve
 is faster than UMFPACK on every matrix** (0.56–0.92×). The end-to-end run
-(`results/bench_splu.log`) additionally shows `arrowband-4000` at **0.27× total
+(`benchmark/results/bench_splu.log`) additionally shows `arrowband-4000` at **0.27× total
 time** and `rand-10000` fill **0.79×** UMFPACK.
 
 ## Supernodal multifrontal vs UMFPACK
 
 Factorization time on 3D Poisson, ratio ÷ C UMFPACK, after two measured optimization
-passes: (1) direct-CSC factor construction (`results/PERF_DIAGNOSIS.md`) and (2) O(1)
-front/contribution-block allocation (`results/SCALING_DIAGNOSIS.md`). "now" =
-`bench/bench_mf_clean.jl` → `results/bench_mf_clean.log` (interleaved, min-of-8, 1 BLAS
+passes: (1) direct-CSC factor construction (`benchmark/results/PERF_DIAGNOSIS.md`) and (2) O(1)
+front/contribution-block allocation (`benchmark/results/SCALING_DIAGNOSIS.md`). "now" =
+`benchmark/bench_mf_clean.jl` → `benchmark/results/bench_mf_clean.log` (interleaved, min-of-8, 1 BLAS
 thread); the COO and direct-CSC columns are from prior logs, kept to trace the passes.
 
 ```
@@ -84,7 +84,7 @@ So multifrontal is now **0.70–0.99× of the C UMFPACK — faster at every 3D s
 (vs GP-LU 5–20× behind). Pass 1 removed the ~66–78% factor-bookkeeping cost; pass 2 cut
 allocation ~4× (3.26 GiB → 787 MiB at n=46656) and roughly halved GC (sustained-loop
 13–35% → 10–29%; ~3–13% single-run), which lowered the whole curve below parity. The
-ratio still drifts mildly with n (per-size, `results/mf_scaling.log`: 0.76, 0.82, 0.71,
+ratio still drifts mildly with n (per-size, `benchmark/results/mf_scaling.log`: 0.76, 0.82, 0.71,
 0.81, 0.81, 0.92, 0.98 over n=1.7k–47k) — mf's numeric growth slope is still marginally
 above UMFPACK's, so the residual large-n GC (~8–13%) is the next lever — but it stays
 <1.0 throughout the tested range instead of crossing it. Verified: fill identical,
@@ -97,7 +97,7 @@ NOTE on process: earlier drafts of these tables twice contained fabricated figur
 (written before the bench logs were read back); each was corrected from the completed
 logs. The numbers above are read back from `bench_mf_OLD.log` / `bench_mf_clean.log`.
 
-## Kernel + sort optimization (bench/alloc_check.jl, results/alloc_check.log)
+## Kernel + sort optimization (benchmark/alloc_check.jl, benchmark/results/alloc_check.log)
 
 poisson2d-100, `gplu` numeric:
 
@@ -113,9 +113,9 @@ poisson2d-100, `gplu` numeric:
   (16.1 MiB with sort vs 12.9 without). The new **allocation-free in-place
   hybrid insertion/merge sort** brings that overhead to **zero** (12.9 == 12.9),
   and is verified to produce canonical CSC identical to a double-transpose
-  (`results/sort_unit.log`: `ALL_SORT_OK`).
+  (`benchmark/results/sort_unit.log`: `ALL_SORT_OK`).
 
-## Profiler (bench/profile_kernel.jl, results/profile_flat.txt)
+## Profiler (benchmark/profile_kernel.jl, benchmark/results/profile_flat.txt)
 
 Time split in `gplu`: ~42% symbolic depth-first reachability (`_reach!`/`_dfs!`),
 ~50% scalar numeric solve (`x[Li[p]] -= Lx[p]*xj`), ~8% sort/output. Both dominant
