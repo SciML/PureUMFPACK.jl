@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2005-2023 Timothy A. Davis (UMFPACK, SuiteSparse) -- GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Row scaling, matching UMFPACK's semantics: the returned factorization satisfies
 #   (Rs .* A)[p, q] = L * U
 # where `Rs .* A` scales row i of A by Rs[i].  UMFPACK's default is SCALE_SUM
@@ -7,10 +11,83 @@
 @enum ScaleKind SCALE_NONE SCALE_SUM SCALE_MAX
 
 """
+    SCALE_NONE::PureUMFPACK.ScaleKind
+
+Disable row scaling before factorization.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> A = sparse([1.0 0.0; 0.0 2.0]);
+
+julia> row_scaling(A, SCALE_NONE);
+```
+"""
+SCALE_NONE
+
+"""
+    SCALE_SUM::PureUMFPACK.ScaleKind
+
+Scale each row by the inverse sum of absolute values in that row. This matches
+UMFPACK's default row-scaling mode.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> A = sparse([1.0 2.0; 0.0 4.0]);
+
+julia> row_scaling(A, SCALE_SUM);
+```
+"""
+SCALE_SUM
+
+"""
+    SCALE_MAX::PureUMFPACK.ScaleKind
+
+Scale each row by the inverse maximum absolute value in that row.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> A = sparse([1.0 2.0; 0.0 4.0]);
+
+julia> row_scaling(A, SCALE_MAX);
+```
+"""
+SCALE_MAX
+
+"""
     row_scaling(A, kind) -> Rs::Vector
 
-Return the row-scaling vector. `Rs[i] * (row i of A)` is the scaled row.
-A zero/empty row gets `Rs[i] = 1` (no scaling) to avoid Inf.
+Compute the row scaling factors used by [`splu`](@ref).
+
+# Arguments
+
+- `A`: Sparse matrix whose rows are scaled.
+- `kind`: Scaling policy: [`SCALE_NONE`](@ref), [`SCALE_SUM`](@ref), or
+  [`SCALE_MAX`](@ref).
+
+# Returns
+
+A vector `Rs` such that row `i` of `A` is multiplied by `Rs[i]`. Empty or zero
+rows receive a scale factor of one.
+
+# Examples
+
+```jldoctest
+julia> using PureUMFPACK, SparseArrays
+
+julia> row_scaling(sparse([1.0 2.0; 0.0 4.0]), SCALE_SUM)
+2-element Vector{Float64}:
+ 0.3333333333333333
+ 0.25
+```
 """
 function row_scaling(A::SparseMatrixCSC{Tv, Ti}, kind::ScaleKind) where {Tv, Ti}
     n = size(A, 1)

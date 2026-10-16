@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chris Rackauckas <accounts@chrisrackauckas.com> and contributors
+# SPDX-FileCopyrightText: 2006 Timothy A. Davis (CSparse, SuiteSparse) -- LGPL-2.1-or-later
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
 # Symbolic analysis for the supernodal multifrontal factorization.
 #
 # Pipeline (all on the symmetric pattern of A + Aᵀ):
@@ -12,7 +16,7 @@ function _sym_csc1(A::SparseMatrixCSC)
     Pat = _patmat(A)
     S = Pat + copy(transpose(Pat))            # sorted CSC
     n = size(S, 2)
-    Sp = getcolptr(S)
+    Sp = _colptr(S)
     Si = rowvals(S)
     cp = Vector{Int}(undef, n + 1)
     cp[1] = 1
@@ -156,26 +160,17 @@ function _col_structure(cp::Vector{Int}, ri::Vector{Int}, parent::Vector{Int}, n
 end
 
 # Supernode partition of a postordered tree.  Column j joins the previous
-# supernode iff j-1 is j's only child and the structures nest closely enough.
-# For a *fundamental* supernode the nesting is exact (colcount[j-1] == colcount[j]
-# + 1, no extra entries); `relax` allows merging when the merge would introduce at
-# most `relax` extra explicit (structural-zero) entries in column j-1, namely
-# e = (1 + colcount[j]) - colcount[j-1] (always >= 0 here since column j-1's
-# structure is a subset of {j} ∪ colstruct[j] when j-1 is j's only child).  With
-# `relax == 0` this reduces exactly to the fundamental partition.
-#
-# When a relaxed (non-fundamental) merge is accepted, the per-column L structure
-# of the interior columns is expanded in place so every column c of a supernode
-# [c1..c2] has colstruct[c] == {c+1, …, c2} ∪ colstruct[c2] — the dense pivot
-# block plus the shared update set the numeric front actually fills.  This keeps
-# `predicted_fill`, `_factor_colptrs`, and the kernel's scatter in exact agreement:
-# all the extra explicit entries are accounted for in the static structure.
-#
+# supernode iff j-1 is j's only child and the merge would introduce at most
+# `relax` extra explicit entries in column j-1, e = (1 + colcount[j]) - colcount[j-1].
+# With `relax == 0` this is exactly the fundamental partition.  Interior columns
+# of a relaxed supernode get the dense front layout {c+1..c2} ∪ colstruct[c2].
 # Returns (sstart, super_of, childsupers):
 #   sstart[k]:sstart[k+1]-1  = columns of supernode k
 #   childsupers[k]           = child supernodes of k (their CBs assemble into k)
-function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int;
-        relax::Int = 0)
+function _supernodes(
+        parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int;
+        relax::Int = 0
+    )
     colcount = [length(colstruct[j]) for j in 1:n]
     nchild = zeros(Int, n)
     @inbounds for j in 1:n
@@ -185,7 +180,7 @@ function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int
     super_of = zeros(Int, n)
     sstart = Int[]
     nsuper = 0
-    relaxed = false                       # any non-fundamental merge accepted?
+    relaxed = false
     @inbounds for j in 1:n
         chain = j > 1 && parent[j - 1] == j && nchild[j] == 1
         extra = chain ? (1 + colcount[j]) - colcount[j - 1] : typemax(Int)
@@ -198,9 +193,6 @@ function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int
         super_of[j] = nsuper
     end
     push!(sstart, n + 1)
-    # Expand interior column structures to the dense front layout only when a
-    # relaxed merge actually widened a supernode (fundamental merges already nest
-    # exactly, so this would be a no-op there — skip it to stay bit-identical).
     if relaxed
         @inbounds for sk in 1:nsuper
             c1 = sstart[sk]
@@ -244,8 +236,10 @@ struct SymbolicMF
     childsupers::Vector{Vector{Int}} # child supernodes per supernode
 end
 
-function symbolic_mf(A::SparseMatrixCSC; q::AbstractVector{<:Integer} = amd_order_sym(A),
-        relax::Integer = 0)
+function symbolic_mf(
+        A::SparseMatrixCSC; q::AbstractVector{<:Integer} = amd_order_sym(A),
+        relax::Integer = 0
+    )
     n = size(A, 2)
     qamd = collect(Int, q)
     # etree + postorder on AMD-reordered pattern, then compose orders

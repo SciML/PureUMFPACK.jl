@@ -15,7 +15,9 @@ for (lbl, q) in (("AMD", qa), ("NATURAL", qn))
     t_s = minimum(@elapsed gplu(A; q = q, tol = 0.1) for _ in 1:7)
     t_n = minimum(@elapsed gplu(A; q = q, tol = 0.1, sort_factors = false) for _ in 1:7)
     F = gplu(A; q = q, tol = 0.1)
-    @printf("poisson2d-100 %-8s fill=%-8d | sort: %.4gs %.1fMiB | nosort: %.4gs %.1fMiB\n",
-        lbl, nnz(F.L)+nnz(F.U), t_s, a_s/2^20, t_n, a_n/2^20)
+    @printf(
+        "poisson2d-100 %-8s fill=%-8d | sort: %.4gs %.1fMiB | nosort: %.4gs %.1fMiB\n",
+        lbl, nnz(F.L) + nnz(F.U), t_s, a_s / 2^20, t_n, a_n / 2^20
+    )
 end
 println("ALLOC_DONE")

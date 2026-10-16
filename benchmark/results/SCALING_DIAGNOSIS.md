@@ -4,7 +4,7 @@
 > `zeros(nf,nf)` front and per-child `Matrix(view(...))` contribution-block copy were
 > replaced by **one reused front workspace + a single growable LIFO arena** (and the
 > redundant `copy(upd)` dropped — those rows already live in `colstruct`). Measured
-> result (`results/mf_scaling.log`, `results/bench_mf_clean.log`, 1 BLAS thread):
+> result (`benchmark/results/mf_scaling.log`, `benchmark/results/bench_mf_clean.log`, 1 BLAS thread):
 > allocation **3.26 GiB → 787 MiB** at n=46656 (~4× less); GC roughly halved
 > (sustained-loop 13–35% → 10–29%; ~3–13% single-run). Net: the clean-bench ratio
 > dropped to **0.70–0.99× of C UMFPACK — faster at every 3D size tested** (was 0.85
@@ -16,7 +16,7 @@
 
 "Our scaling is worse" = the multifrontal/UMFPACK time ratio **degrades as the
 problem grows**: it *beats* the C library on small 3D Poisson but falls behind on
-large ones. Measured (`bench/mf_scaling.jl` → `results/mf_scaling.log`, real shipped
+large ones. Measured (`benchmark/mf_scaling.jl` → `benchmark/results/mf_scaling.log`, real shipped
 `multifrontal_lu`, 1 BLAS thread, AMD EPYC 7502):
 
 | k | n | UMF | mf full | mf/UMF | alloc | nsuper | max front |
@@ -52,7 +52,7 @@ UMFPACK is C with one preallocated workspace pool — it does **zero** GC. Our k
 allocates **per supernode**, and that allocation rate is what scales against us.
 Allocation grows 18 MiB → **3.26 GiB** (k=12 → k=36), and the resulting garbage
 collection takes a growing slice of wall time. Steady GC fraction over many reps
-(`bench/mf_alloc_attrib.jl` → `results/mf_alloc_attrib.log`):
+(`benchmark/mf_alloc_attrib.jl` → `benchmark/results/mf_alloc_attrib.log`):
 
 | k | n | total alloc | GC fraction of wall |
 |---|---|---|---|
@@ -122,5 +122,5 @@ the residual (~1.1×) is ordinary per-front pure-Julia overhead, not a scaling d
 ## Caveat
 
 3D Poisson, structurally symmetric (the multifrontal target), 1 BLAS thread.
-`results/mf_scaling.log` and `results/mf_alloc_attrib.log` are the authoritative
+`benchmark/results/mf_scaling.log` and `benchmark/results/mf_alloc_attrib.log` are the authoritative
 sources; numbers above are copied from those completed logs.
