@@ -566,7 +566,8 @@ function _factor_threaded!(
     catch err
         err isa CompositeException || rethrow()
         inner = first(err.exceptions)
-        throw(inner isa TaskFailedException ? inner.task.exception : inner)
+        inner isa TaskFailedException || throw(inner)
+        throw(last(current_exceptions(inner.task; backtrace = false)).exception)
     end
 
     # serial upper tree: every supernode not inside a chosen subtree, in postorder.
