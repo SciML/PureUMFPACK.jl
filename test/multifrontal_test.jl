@@ -94,7 +94,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
             for i in 1:n
                 A[i, i] = 0.0
             end
-            while abs(det(Matrix(A))) < 1e-2
+            while abs(det(Matrix(A))) < 1.0e-2
                 A = A + sprandn(rng, n, n, 0.1)
                 for i in 1:n
                     A[i, i] = 0.0
@@ -109,8 +109,10 @@ isperm1(p, n) = sort(p) == collect(1:n)
             sparse(Matrix(U0)[randperm(rng, n), :])
         end
 
-        unsym = [zerodiag(10, 0.5, 11), zerodiag(20, 0.35, 5),
-            rowperm_upper(8, 3), rowperm_upper(15, 9)]
+        unsym = [
+            zerodiag(10, 0.5, 11), zerodiag(20, 0.35, 5),
+            rowperm_upper(8, 3), rowperm_upper(15, 9),
+        ]
 
         @testset "in-block path is inadequate here" begin
             # At least one of these must defeat the restricted in-block pivoting
@@ -121,7 +123,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
                 bad = try
                     Fi = multifrontal_lu(A; delayed = false, check = false)
                     R = Matrix(A[Fi.p, Fi.q]) - Matrix(Fi.L * Fi.U)
-                    !isfinite(norm(R)) || norm(R) > 1e-6 * max(1.0, norm(Matrix(A)))
+                    !isfinite(norm(R)) || norm(R) > 1.0e-6 * max(1.0, norm(Matrix(A)))
                 catch
                     true
                 end
@@ -138,7 +140,7 @@ isperm1(p, n) = sort(p) == collect(1:n)
                 @test istriu(F.U)
                 @test isperm1(F.p, n) && isperm1(F.q, n)
                 R = Matrix(A[F.p, F.q]) - Matrix(F.L * F.U)
-                @test norm(R) <= 1e-10 * max(1.0, norm(Matrix(A)))
+                @test norm(R) <= 1.0e-10 * max(1.0, norm(Matrix(A)))
             end
         end
 
@@ -146,15 +148,17 @@ isperm1(p, n) = sort(p) == collect(1:n)
             for A in unsym
                 n = size(A, 1)
                 b = randn(n)
-                xd = splu(A; method = :multifrontal, delayed = true,
-                    tol = 0.1, scale = SCALE_NONE) \ b
+                xd = splu(
+                    A; method = :multifrontal, delayed = true,
+                    tol = 0.1, scale = SCALE_NONE
+                ) \ b
                 xg = splu(A; method = :gplu, tol = 0.1, scale = SCALE_NONE) \ b
                 xu = lu(A) \ b
                 # real backward error of the delayed solve
-                @test norm(A * xd - b) / norm(b) <= 1e-8
+                @test norm(A * xd - b) / norm(b) <= 1.0e-8
                 # delayed agrees with both robust references
-                @test norm(xd - xu) / norm(xu) <= 1e-7
-                @test norm(xd - xg) / norm(xg) <= 1e-7
+                @test norm(xd - xu) / norm(xu) <= 1.0e-7
+                @test norm(xd - xg) / norm(xg) <= 1.0e-7
             end
         end
 
@@ -164,9 +168,9 @@ isperm1(p, n) = sort(p) == collect(1:n)
                 b = randn(n)
                 F = multifrontal_lu(A; tol = 0.1, delayed = true, check = true)
                 R = Matrix(A[F.p, F.q]) - Matrix(F.L * F.U)
-                @test norm(R) <= 1e-9 * max(1.0, norm(Matrix(A)))
+                @test norm(R) <= 1.0e-9 * max(1.0, norm(Matrix(A)))
                 x = splu(A; method = :multifrontal, delayed = true, tol = 0.1) \ b
-                @test norm(A * x - b) / norm(b) <= 1e-8
+                @test norm(A * x - b) / norm(b) <= 1.0e-8
             end
         end
 

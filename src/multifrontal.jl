@@ -409,7 +409,8 @@ end
 # workspace is O(n²): this is the robustness/correctness path, not the
 # performance path, and is opt-in via `delayed=true`.
 function _multifrontal_delayed(A::SparseMatrixCSC{Tv, Ti}, S, tol, check::Bool) where {
-        Tv, Ti <: Integer}
+        Tv, Ti <: Integer,
+    }
     n = size(A, 2)
     qf = collect(Ti, S.qf)
     W = Matrix(A[qf, qf])                 # dense trailing front in front coords
