@@ -3,17 +3,17 @@
 > **RESOLVED.** Acting on the diagnosis below, the factor-construction path was
 > rewritten (COO triplets → direct preallocated CSC), which removed the dominant
 > ~66–78% bookkeeping cost. Clean interleaved before/after (min-of-8, 1 BLAS thread,
-`results/bench_mf_OLD.log`): mf/UMF on 3D Poisson went from **~1.4–2.2× → 0.85–1.23×**
+`benchmark/results/bench_mf_OLD.log`): mf/UMF on 3D Poisson went from **~1.4–2.2× → 0.85–1.23×**
 > with this (direct-CSC) pass alone — a later O(1)-allocation pass took it further to
-> 0.70–0.99× (see `results/SCALING_DIAGNOSIS.md`). Fill unchanged,
+> 0.70–0.99× (see `benchmark/results/SCALING_DIAGNOSIS.md`). Fill unchanged,
 > residual ~1e-15, full suite 206/206. The dense phase was confirmed already optimal
 > (no change); symbolic + extend-add got smaller tuning wins. Details at the bottom.
 > The diagnosis that followed is preserved as the record of how the gap was found.
 
 Goal: dissect *where* the ~2.4–3.3× wall-clock gap to the C UMFPACK comes from on
-3D Poisson, by phase. All numbers are measured by `bench/mf_diagnose.jl` (an
+3D Poisson, by phase. All numbers are measured by `benchmark/mf_diagnose.jl` (an
 instrumented copy of `multifrontal_lu` with per-phase timers, flop accounting, and a
-front-size histogram), AMD EPYC 7502, Julia 1.12. Raw log: `results/mf_diagnose.log`.
+front-size histogram), AMD EPYC 7502, Julia 1.12. Raw log: `benchmark/results/mf_diagnose.log`.
 
 > Correction note: an earlier draft of this file (and the matching memory) contained
 > a *fabricated* breakdown — written from expectation before the diagnostic had been
@@ -112,7 +112,7 @@ Secondary (smaller) items, in priority order after the above:
 ## Caveat
 
 Diagnosis is on 3D Poisson (structurally symmetric — the multifrontal target).
-`results/mf_diagnose.log` is the authoritative source; a separate cross-check run
+`benchmark/results/mf_diagnose.log` is the authoritative source; a separate cross-check run
 (`symbolic_frac` 5.3–7.5 %) confirms the symbolic fraction independently.
 
 ## Outcome — what was changed and the measured result
@@ -140,8 +140,8 @@ One agent per area investigated and fixed its phase; all kept the full suite at
    front workspace buffer instead of `zeros(nf,nf)` per supernode. Small, strict
    work reduction.
 
-**Clean before/after** (same harness `bench/bench_mf_clean.jl`, interleaved UMF/mf,
-min-of-8, 1 BLAS thread; `results/bench_mf_OLD.log` vs `results/bench_mf_clean.log`):
+**Clean before/after** (same harness `benchmark/bench_mf_clean.jl`, interleaved UMF/mf,
+min-of-8, 1 BLAS thread; `benchmark/results/bench_mf_OLD.log` vs `benchmark/results/bench_mf_clean.log`):
 
 | matrix | n | old mf ×UMF | new mf ×UMF |
 |---|---|---|---|
