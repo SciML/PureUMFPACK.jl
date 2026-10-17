@@ -104,7 +104,7 @@ function _factor_colptrs(
 end
 
 """
-    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, check=true) -> GPLUFactorization
+    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, relax=0, check=true) -> GPLUFactorization
 
 Compute a supernodal multifrontal sparse LU factorization. This method is designed
 for structurally symmetric, diagonally dominant, or SPD-like matrices where dense
@@ -119,6 +119,12 @@ frontal BLAS operations are effective.
 - `q`: Optional one-based column order. When omitted, the package computes an AMD
   plus postorder order from the symbolic analysis.
 - `tol`: Reserved for compatibility with the low-level factorization interface.
+- `relax`: Relaxed supernode amalgamation budget, a nonnegative integer. `0` keeps
+  the fundamental supernode partition, which adds no fill. With `relax > 0`, a
+  chain of supernodes is merged into one larger dense front as long as every
+  column of `L` in the merged supernode, and the matching row of `U`, gains at
+  most `relax` explicitly stored entries over the `relax = 0` factor. Hence
+  `nnz(F.L)` and `nnz(F.U)` each grow by at most `relax * size(A, 2)`.
 - `check`: Whether to throw for a singular pivot.
 
 # Returns
@@ -128,6 +134,7 @@ A [`GPLUFactorization`](@ref) satisfying `A[F.p, F.q] == F.L * F.U`.
 # Throws
 
 - `DimensionMismatch`: `A` is not square.
+- `ArgumentError`: `relax < 0`.
 - `SingularException`: a pivot is singular and `check=true`.
 
 # Examples
@@ -145,11 +152,11 @@ julia> F \\ [1.0, 0.0]
 """
 function multifrontal_lu(
         A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
-        check::Bool = true
+        relax::Integer = 0, check::Bool = true
     ) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("multifrontal_lu requires a square matrix"))
-    S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)
+    S = q === nothing ? symbolic_mf(A; relax = relax) : symbolic_mf(A; q = q, relax = relax)
     qf = S.qf
     V = A[qf, qf]
     Vt = copy(transpose(V))

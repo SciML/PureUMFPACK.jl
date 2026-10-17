@@ -48,7 +48,7 @@ Base.size(F::PureLU) = (size(F.L, 1), size(F.U, 2))
 Base.size(F::PureLU, i::Integer) = size(F)[i]
 
 """
-    splu(A; method=:gplu, ordering=:amd, tol=0.1, scale=SCALE_SUM, check=true) -> PureLU
+    splu(A; method=:gplu, ordering=:amd, tol=0.1, relax=0, scale=SCALE_SUM, check=true) -> PureLU
 
 Factorize a square sparse matrix with the high-level PureUMFPACK interface.
 
@@ -63,6 +63,8 @@ Factorize a square sparse matrix with the high-level PureUMFPACK interface.
   postordering and ignores `ordering`.
 - `ordering`: `:amd`, `:colamd`, or `:natural` column order for `method=:gplu`.
 - `tol`: Gilbert-Peierls pivot threshold in `[0, 1]`; see [`gplu`](@ref).
+- `relax`: Supernode amalgamation budget for `method=:multifrontal`; see
+  [`multifrontal_lu`](@ref). Ignored by `method=:gplu`.
 - `scale`: Row scaling policy: [`SCALE_SUM`](@ref), [`SCALE_MAX`](@ref), or
   [`SCALE_NONE`](@ref).
 - `check`: Whether to throw `SingularException` for a singular pivot.
@@ -74,7 +76,8 @@ A [`PureLU`](@ref) that supports `size`, [`solve`](@ref), and `\\`.
 # Throws
 
 - `DimensionMismatch`: `A` is not square.
-- `ArgumentError`: `method` or `ordering` is not supported.
+- `ArgumentError`: `method` or `ordering` is not supported, or `relax < 0` with
+  `method=:multifrontal`.
 - `SingularException`: a pivot is singular and `check=true`.
 
 # Examples
@@ -92,7 +95,8 @@ julia> F \\ [1.0, 0.0]
 """
 function splu(
         A::SparseMatrixCSC{Tv, Ti}; method::Symbol = :gplu, ordering::Symbol = :amd,
-        tol::Real = 0.1, scale::ScaleKind = SCALE_SUM, check::Bool = true
+        tol::Real = 0.1, relax::Integer = 0, scale::ScaleKind = SCALE_SUM,
+        check::Bool = true
     ) where {
         Tv, Ti <: Integer,
     }
@@ -101,7 +105,7 @@ function splu(
     Rs = row_scaling(A, scale)
     As = scale == SCALE_NONE ? A : apply_row_scaling(A, Rs)
     if method === :multifrontal
-        F = multifrontal_lu(As; check = check)
+        F = multifrontal_lu(As; relax = relax, check = check)
         return PureLU(F.L, F.U, F.p, F.q, Rs, A)
     elseif method !== :gplu
         throw(ArgumentError("unknown method $method"))

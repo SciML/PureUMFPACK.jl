@@ -159,12 +159,21 @@ function _col_structure(cp::Vector{Int}, ri::Vector{Int}, parent::Vector{Int}, n
     return colstruct
 end
 
-# Fundamental-supernode partition of a postordered tree.  Column j joins the
-# previous supernode iff j-1 is j's only child and the structures nest exactly
-# (colcount[j-1] == colcount[j] + 1).  Returns (sstart, super_of, childsupers):
+# Relaxed-supernode partition of a postordered tree.  Column j may join the
+# previous supernode [c1..j-1] only if j-1 is j's only child.  Merging gives every
+# column c of [c1..j] the dense front layout {c+1..j} ∪ colstruct[j], i.e.
+# (j + colcount[j]) - (c + colcount[c]) >= 0 extra entries over its own structure;
+# j joins iff that is <= relax for every c, tracked as the minimum of c + colcount[c]
+# over the supernode.  relax = 0 is exactly the fundamental partition
+# (colcount[j-1] == colcount[j] + 1).  Columns of widened supernodes get their
+# colstruct expanded to the dense layout so `predicted_fill` counts every stored
+# entry.  Returns (sstart, super_of, childsupers):
 #   sstart[k]:sstart[k+1]-1  = columns of supernode k
 #   childsupers[k]           = child supernodes of k (their CBs assemble into k)
-function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int)
+function _supernodes(
+        parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int;
+        relax::Int = 0
+    )
     colcount = [length(colstruct[j]) for j in 1:n]
     nchild = zeros(Int, n)
     @inbounds for j in 1:n
@@ -174,16 +183,30 @@ function _supernodes(parent::Vector{Int}, colstruct::Vector{Vector{Int}}, n::Int
     super_of = zeros(Int, n)
     sstart = Int[]
     nsuper = 0
+    widened = Bool[]
+    dmin = 0
     @inbounds for j in 1:n
-        cont = j > 1 && parent[j - 1] == j && nchild[j] == 1 &&
-            colcount[j - 1] == colcount[j] + 1
-        if !cont
+        dj = j + colcount[j]
+        cont = j > 1 && parent[j - 1] == j && nchild[j] == 1 && dj - dmin <= relax
+        if cont
+            widened[nsuper] |= dj > dmin
+        else
             nsuper += 1
             push!(sstart, j)
+            push!(widened, false)
+            dmin = dj
         end
         super_of[j] = nsuper
     end
     push!(sstart, n + 1)
+    @inbounds for sk in 1:nsuper
+        widened[sk] || continue
+        c2 = sstart[sk + 1] - 1
+        upd = colstruct[c2]
+        for c in sstart[sk]:(c2 - 1)
+            colstruct[c] = vcat((c + 1):c2, upd)
+        end
+    end
     childsupers = [Int[] for _ in 1:nsuper]
     @inbounds for sk in 1:nsuper
         lastcol = sstart[sk + 1] - 1
@@ -208,7 +231,11 @@ struct SymbolicMF
     childsupers::Vector{Vector{Int}} # child supernodes per supernode
 end
 
-function symbolic_mf(A::SparseMatrixCSC; q::AbstractVector{<:Integer} = amd_order_sym(A))
+function symbolic_mf(
+        A::SparseMatrixCSC; q::AbstractVector{<:Integer} = amd_order_sym(A),
+        relax::Integer = 0
+    )
+    relax >= 0 || throw(ArgumentError("relax must be nonnegative, got $relax"))
     n = size(A, 2)
     qamd = collect(Int, q)
     # etree + postorder on AMD-reordered pattern, then compose orders
@@ -221,7 +248,7 @@ function symbolic_mf(A::SparseMatrixCSC; q::AbstractVector{<:Integer} = amd_orde
     cpF, riF = _permute_sym_csc1(cp1, ri1, post, n)
     parentF = _etree(cpF, riF, n)
     colstruct = _col_structure(cpF, riF, parentF, n)
-    sstart, super_of, childsupers = _supernodes(parentF, colstruct, n)
+    sstart, super_of, childsupers = _supernodes(parentF, colstruct, n; relax = Int(relax))
     return SymbolicMF(qf, parentF, colstruct, sstart, childsupers)
 end
 
