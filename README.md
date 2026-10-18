@@ -169,7 +169,12 @@ for general unsymmetric stability (multifrontal uses in-block pivoting).
   dense-front flops run through BLAS-3. Pivoting is restricted to within each
   supernode (the L factor is accumulated in global-row coordinates, then permuted
   to factor order), which is stable for SPD / diagonally-dominant / structurally
-  symmetric systems. It does **not** do cross-front threshold (delayed) pivoting.
+  symmetric systems. For general unsymmetric matrices, `delayed=true` enables a
+  dense threshold-pivoting fallback using O(n²) workspace and O(n³) arithmetic.
+  This fallback keeps the symbolic column order and prefers available diagonal
+  pivots whose magnitudes are at least `tol` times the column maximum. Numerical
+  row pivoting can exceed the symbolic fill estimate. Cross-front propagation of delayed columns is not
+  implemented.
 
 ## Status / next steps
 

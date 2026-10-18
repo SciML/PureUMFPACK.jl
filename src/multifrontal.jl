@@ -120,14 +120,13 @@ frontal BLAS operations are effective.
   plus postorder order from the symbolic analysis.
 - `tol`: Pivot threshold in `[0, 1]` with [`gplu`](@ref) threshold semantics. Used
   only by the `delayed=true` path; ignored by the default in-block path.
-- `delayed`: Enable cross-front (delayed) threshold pivoting. A pivot column whose
-  in-front candidate rows all fail the threshold test is delayed — left unfactored
-  and re-offered later when a larger candidate-row set is available — so the result
-  carries a column permutation `q != qf` in general and `predicted_fill` becomes an
-  upper bound. The delayed front is realized densely (O(n²) workspace): this is the
-  robustness path for genuinely unsymmetric matrices with small/zero diagonal
-  entries, where in-block pivoting is inadequate. Default `false` is bit-identical
-  to previous releases.
+- `delayed`: Enable a dense threshold-pivoting fallback for general unsymmetric
+  matrices with small or zero diagonal entries. All remaining rows are available
+  for each pivot; the column order is fixed at the symbolic order `qf`. This path
+  uses O(n²) workspace and O(n³) arithmetic rather than propagating delayed columns
+  between fronts. Numerical row pivoting can introduce fill beyond the symbolic
+  `predicted_fill` estimate, so that estimate is not a storage bound. Default
+  `false` selects the supernodal in-block path.
 - `check`: Whether to throw for a singular pivot.
 
 # Returns
@@ -386,28 +385,8 @@ end
     return orig
 end
 
-# ---------------------------------------------------------------------------
-# Cross-front (delayed) threshold pivoting.
-#
-# The in-block kernel above can only pivot among a supernode's own block rows, so
-# on a genuinely unsymmetric matrix whose fully-summed candidate rows all fail the
-# threshold test it produces a tiny/zero pivot (NaN factor / SingularException).
-# Delayed pivoting fixes this: a column with no acceptable in-front pivot is
-# *delayed* — left unfactored and reconsidered once more rows are available (i.e.
-# at the parent front, a strictly larger candidate-row set).
-#
-# Delaying a column is a column interchange, so this path yields BOTH a row
-# permutation `p` and a column permutation `q` and the factorization satisfies
-#     A[p, q] == L * U                       (P * A * Q == L * U)
-# exactly as the gplu path does. Reconstruction is correct for ANY pivot policy —
-# it is Gaussian elimination with row/column interchanges — so this only changes
-# stability and fill, never the L*U == A[p,q] identity.
-#
-# The active (trailing) front is held densely. We still use the symbolic order
-# `qf` so that, when no delay occurs, the column order matches the in-block path's
-# fill ordering; the symbolic `predicted_fill` is then an upper bound. The dense
-# workspace is O(n²): this is the robustness/correctness path, not the
-# performance path, and is opt-in via `delayed=true`.
+# Dense threshold pivoting uses all remaining rows and the symbolic column order.
+# Numerical row interchanges can exceed the symbolic fill estimate.
 function _multifrontal_delayed(A::SparseMatrixCSC{Tv, Ti}, S, tol, check::Bool) where {
         Tv, Ti <: Integer,
     }
@@ -416,63 +395,30 @@ function _multifrontal_delayed(A::SparseMatrixCSC{Tv, Ti}, S, tol, check::Bool) 
     W = Matrix(A[qf, qf])                 # dense trailing front in front coords
 
     rperm = collect(1:n)                  # step k -> front-row eliminated at k
-    cperm = collect(1:n)                  # step k -> front-col eliminated at k
     tolv = real(Tv)(tol)
 
-    # Factor fully in place in W (LAPACK getrf style): row/column interchanges are
+    # Factor fully in place in W (LAPACK getrf style): row interchanges are
     # applied across all of W, so the stored L multipliers are carried along by
     # subsequent swaps and stay consistent. After the loop L == tril(W,-1)+I and
     # U == triu(W) in the final (post-permutation) coordinates.
     @inbounds for k in 1:n
-        # Choose a pivot: prefer the leftmost remaining column; among rows k:n
-        # pick the largest magnitude that also meets the threshold relative to the
-        # whole-column max. If none qualifies, DELAY (advance to the next column —
-        # a column interchange) and retry, mirroring carrying the column to the
-        # parent front. A column whose remaining entries are all zero is skipped.
-        chosen_col = 0
-        chosen_row = 0
-        col = k
-        while col <= n
-            cmax = zero(real(Tv))
-            for i in k:n
-                av = abs(W[i, col])
-                av > cmax && (cmax = av)
+        cmax = zero(real(Tv))
+        chosen_row = k
+        diagonal_row = 0
+        for i in k:n
+            av = abs(W[i, k])
+            if av > cmax
+                cmax = av
+                chosen_row = i
             end
-            if cmax == zero(real(Tv))
-                col += 1                  # structurally/numerically empty: delay
-                continue
-            end
-            best = zero(real(Tv))
-            brow = 0
-            for i in k:n
-                av = abs(W[i, col])
-                if av >= tolv * cmax && av > best
-                    best = av
-                    brow = i
-                end
-            end
-            if brow == 0
-                col += 1                  # no threshold pivot here: delay column
-                continue
-            end
-            chosen_col = col
-            chosen_row = brow
-            break
+            rperm[i] == k && (diagonal_row = i)
         end
-
-        if chosen_col == 0
+        if iszero(cmax)
             check && throw(SingularException(k))
-            chosen_col = k                # best-effort continue (singular)
-            chosen_row = k
+        elseif diagonal_row != 0 && abs(W[diagonal_row, k]) >= tolv * cmax
+            chosen_row = diagonal_row
         end
 
-        # Column interchange k <-> chosen_col.
-        if chosen_col != k
-            for i in 1:n
-                W[i, k], W[i, chosen_col] = W[i, chosen_col], W[i, k]
-            end
-            cperm[k], cperm[chosen_col] = cperm[chosen_col], cperm[k]
-        end
         # Row interchange k <-> chosen_row.
         if chosen_row != k
             for j in 1:n
@@ -501,9 +447,8 @@ function _multifrontal_delayed(A::SparseMatrixCSC{Tv, Ti}, S, tol, check::Bool) 
     Umat = _upper_csc_delayed(W, n, Ti, Tv)
 
     p = qf[rperm]                         # A[p, q] = L*U
-    qout = qf[cperm]
     pinv = invperm(p)
-    return GPLUFactorization(Lmat, Umat, p, qout, pinv)
+    return GPLUFactorization(Lmat, Umat, p, qf, pinv)
 end
 
 # Strictly-lower part of dense W plus a unit diagonal, as sorted CSC (diagonal is

@@ -66,9 +66,9 @@ Factorize a square sparse matrix with the high-level PureUMFPACK interface.
   pivot threshold for `method=:multifrontal` when `delayed=true`.
 - `scale`: Row scaling policy: [`SCALE_SUM`](@ref), [`SCALE_MAX`](@ref), or
   [`SCALE_NONE`](@ref).
-- `delayed`: (`method=:multifrontal` only) enable cross-front (delayed) threshold
-  pivoting for general-unsymmetric robustness. Default `false` keeps the in-block
-  path bit-identical to previous releases (see [`multifrontal_lu`](@ref)).
+- `delayed`: (`method=:multifrontal` only) enable the dense threshold-pivoting
+  fallback with O(n²) workspace for general unsymmetric matrices. Default `false`
+  selects the supernodal in-block path (see [`multifrontal_lu`](@ref)).
 - `check`: Whether to throw `SingularException` for a singular pivot.
 
 # Returns

@@ -82,11 +82,40 @@ isperm1(p, n) = sort(p) == collect(1:n)
         @test_throws ArgumentError splu(D; method = :nonsense)
     end
 
-    # Cross-front (delayed) threshold pivoting: genuinely unsymmetric matrices
-    # with small/zero diagonal entries where the in-block path's restricted
-    # pivoting is inadequate (it produces a NaN factor / SingularException) but
-    # cross-front delay matches UMFPACK and the already-robust GP-LU path.
-    @testset "delayed pivoting (cross-front)" begin
+    @testset "dense threshold pivoting (delayed=true)" begin
+        @testset "threshold diagonal preference" begin
+            for T in (Float32, Float64, ComplexF64), tol in (0.0, 0.1, 1.0)
+                A = sparse(T[0.5 1; 1 1])
+                F = multifrontal_lu(A; q = 1:2, delayed = true, tol = tol)
+                G = gplu(A; q = F.q, tol = tol)
+                @test F.p == (tol <= 0.5 ? [1, 2] : [2, 1])
+                @test F.p == G.p
+                @test A[F.p, F.q] ≈ F.L * F.U
+                @test F \ T[1, 2] ≈ lu(Matrix(A)) \ T[1, 2]
+            end
+        end
+
+        @testset "diagonal row already eliminated" begin
+            A = sparse([0.1 1 0; 2 0 1; 1 2 3])
+            F = multifrontal_lu(A; q = 1:3, delayed = true, tol = 0.1)
+            G = gplu(A; q = F.q, tol = 0.1)
+            @test F.p == G.p == [2, 3, 1]
+            @test A[F.p, F.q] ≈ F.L * F.U
+        end
+
+        @testset "pivot fill can exceed the symbolic estimate" begin
+            arrow = spdiagm(0 => fill(0.01, 4))
+            arrow[1, :] .= 1.0
+            arrow[:, 1] .= 1.0
+            for (A, q) in ((sparse([1.0 1 0; 2 3 1; 0 1 4]), 1:3), (arrow, nothing))
+                S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)
+                F = multifrontal_lu(A; q = q, delayed = true, tol = 1.0)
+                @test F.q == S.qf
+                @test nnz(F.L) + nnz(F.U) > predicted_fill(S)
+                @test A[F.p, F.q] ≈ F.L * F.U
+            end
+        end
+
         # zero-diagonal random unsymmetric (in-block pivoting fails)
         zerodiag(n, p, seed) = begin
             rng = MersenneTwister(seed)
