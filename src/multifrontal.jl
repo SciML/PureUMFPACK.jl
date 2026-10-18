@@ -104,7 +104,7 @@ function _factor_colptrs(
 end
 
 """
-    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=nothing, check=true) -> GPLUFactorization
+    multifrontal_lu(A::SparseMatrixCSC; q=nothing, tol=0.1, delayed=false, check=true) -> GPLUFactorization
 
 Compute a supernodal multifrontal sparse LU factorization. This method is designed
 for structurally symmetric, diagonally dominant, or SPD-like matrices where dense
@@ -118,7 +118,15 @@ frontal BLAS operations are effective.
 
 - `q`: Optional one-based column order. When omitted, the package computes an AMD
   plus postorder order from the symbolic analysis.
-- `tol`: Reserved for compatibility with the low-level factorization interface.
+- `tol`: Pivot threshold in `[0, 1]` with [`gplu`](@ref) threshold semantics. Used
+  only by the `delayed=true` path; ignored by the default in-block path.
+- `delayed`: Enable a dense threshold-pivoting fallback for general unsymmetric
+  matrices with small or zero diagonal entries. All remaining rows are available
+  for each pivot; the column order is fixed at the symbolic order `qf`. This path
+  uses O(n²) workspace and O(n³) arithmetic rather than propagating delayed columns
+  between fronts. Numerical row pivoting can introduce fill beyond the symbolic
+  `predicted_fill` estimate, so that estimate is not a storage bound. Default
+  `false` selects the supernodal in-block path.
 - `check`: Whether to throw for a singular pivot.
 
 # Returns
@@ -144,12 +152,15 @@ julia> F \\ [1.0, 0.0]
 ```
 """
 function multifrontal_lu(
-        A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = nothing,
-        check::Bool = true
+        A::SparseMatrixCSC{Tv, Ti}; q = nothing, tol = 0.1,
+        delayed::Bool = false, check::Bool = true
     ) where {Tv, Ti <: Integer}
     n = size(A, 2)
     size(A, 1) == n || throw(DimensionMismatch("multifrontal_lu requires a square matrix"))
     S = q === nothing ? symbolic_mf(A) : symbolic_mf(A; q = q)
+    if delayed
+        return _multifrontal_delayed(A, S, tol, check)
+    end
     qf = S.qf
     V = A[qf, qf]
     Vt = copy(transpose(V))
@@ -372,4 +383,133 @@ end
         end
     end
     return orig
+end
+
+# Dense threshold pivoting uses all remaining rows and the symbolic column order.
+# Numerical row interchanges can exceed the symbolic fill estimate.
+function _multifrontal_delayed(A::SparseMatrixCSC{Tv, Ti}, S, tol, check::Bool) where {
+        Tv, Ti <: Integer,
+    }
+    n = size(A, 2)
+    qf = collect(Ti, S.qf)
+    W = Matrix(A[qf, qf])                 # dense trailing front in front coords
+
+    rperm = collect(1:n)                  # step k -> front-row eliminated at k
+    tolv = real(Tv)(tol)
+
+    # Factor fully in place in W (LAPACK getrf style): row interchanges are
+    # applied across all of W, so the stored L multipliers are carried along by
+    # subsequent swaps and stay consistent. After the loop L == tril(W,-1)+I and
+    # U == triu(W) in the final (post-permutation) coordinates.
+    @inbounds for k in 1:n
+        cmax = zero(real(Tv))
+        chosen_row = k
+        diagonal_row = 0
+        for i in k:n
+            av = abs(W[i, k])
+            if av > cmax
+                cmax = av
+                chosen_row = i
+            end
+            rperm[i] == k && (diagonal_row = i)
+        end
+        if iszero(cmax)
+            check && throw(SingularException(k))
+        elseif diagonal_row != 0 && abs(W[diagonal_row, k]) >= tolv * cmax
+            chosen_row = diagonal_row
+        end
+
+        # Row interchange k <-> chosen_row.
+        if chosen_row != k
+            for j in 1:n
+                W[k, j], W[chosen_row, j] = W[chosen_row, j], W[k, j]
+            end
+            rperm[k], rperm[chosen_row] = rperm[chosen_row], rperm[k]
+        end
+
+        piv = W[k, k]
+        # L column k (stored back into W) and rank-1 trailing update.
+        for i in (k + 1):n
+            wik = W[i, k]
+            if wik != zero(Tv)
+                lik = wik / piv
+                W[i, k] = lik
+                for j in (k + 1):n
+                    W[i, j] -= lik * W[k, j]
+                end
+            end
+        end
+    end
+
+    # Extract L = tril(W,-1) + I and U = triu(W) directly into sorted CSC, so the
+    # solve invariants hold (L unit diagonal first per column, U diagonal last).
+    Lmat = _lower_csc_delayed(W, n, Ti, Tv)
+    Umat = _upper_csc_delayed(W, n, Ti, Tv)
+
+    p = qf[rperm]                         # A[p, q] = L*U
+    pinv = invperm(p)
+    return GPLUFactorization(Lmat, Umat, p, qf, pinv)
+end
+
+# Strictly-lower part of dense W plus a unit diagonal, as sorted CSC (diagonal is
+# the first stored entry of each column — the L solve invariant).
+function _lower_csc_delayed(W::Matrix{Tv}, n, ::Type{Ti}, ::Type{Tv}) where {Ti, Tv}
+    colptr = Vector{Ti}(undef, n + 1)
+    colptr[1] = 1
+    @inbounds for j in 1:n
+        cnt = 1                           # unit diagonal
+        for i in (j + 1):n
+            W[i, j] != zero(Tv) && (cnt += 1)
+        end
+        colptr[j + 1] = colptr[j] + cnt
+    end
+    nz = Int(colptr[n + 1]) - 1
+    rowval = Vector{Ti}(undef, nz)
+    nzval = Vector{Tv}(undef, nz)
+    @inbounds for j in 1:n
+        t = Int(colptr[j])
+        rowval[t] = Ti(j)                 # diagonal first
+        nzval[t] = one(Tv)
+        t += 1
+        for i in (j + 1):n
+            v = W[i, j]
+            if v != zero(Tv)
+                rowval[t] = Ti(i)
+                nzval[t] = v
+                t += 1
+            end
+        end
+    end
+    return SparseMatrixCSC(n, n, colptr, rowval, nzval)
+end
+
+# Upper part of dense W (rows 1:j of column j), as sorted CSC (diagonal is the
+# last stored entry of each column — the U solve invariant).
+function _upper_csc_delayed(W::Matrix{Tv}, n, ::Type{Ti}, ::Type{Tv}) where {Ti, Tv}
+    colptr = Vector{Ti}(undef, n + 1)
+    colptr[1] = 1
+    @inbounds for j in 1:n
+        cnt = 0
+        for i in 1:(j - 1)
+            W[i, j] != zero(Tv) && (cnt += 1)
+        end
+        colptr[j + 1] = colptr[j] + cnt + 1   # +1 for the diagonal (always kept)
+    end
+    nz = Int(colptr[n + 1]) - 1
+    rowval = Vector{Ti}(undef, nz)
+    nzval = Vector{Tv}(undef, nz)
+    @inbounds for j in 1:n
+        t = Int(colptr[j])
+        for i in 1:(j - 1)
+            v = W[i, j]
+            if v != zero(Tv)
+                rowval[t] = Ti(i)
+                nzval[t] = v
+                t += 1
+            end
+        end
+        rowval[t] = Ti(j)                 # diagonal last
+        nzval[t] = W[j, j]
+    end
+    return SparseMatrixCSC(n, n, colptr, rowval, nzval)
 end
